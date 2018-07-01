@@ -1,15 +1,10 @@
-import io from 'socket'
 import pathToRegexp from 'path-to-regexp'
 
-import Emitter from '@/core/Emitter'
-import Message from '@/core/Message'
+import {Emitter} from '@freshlysqueezedgames/emitter'
 
 import Action from './Action'
 import Reducer from './Reducer'
 import Route from './Route'
-
-const message: Message = Message.Instance()
-const socket: SocketIO = io()
 
 const {toString, hasOwnProperty} = Object.prototype
 const instances: Object = {}

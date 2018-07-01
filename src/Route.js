@@ -1,5 +1,4 @@
 import pathToRegexp from 'path-to-regexp'
-import {PossibleFragmentSpreadsRule} from 'graphql/validation';
 
 /**
  * @class Route

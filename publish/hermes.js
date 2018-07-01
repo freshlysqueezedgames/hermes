@@ -641,6 +641,7 @@ Hermes.Instance = function (name, props) {
 
 exports.Reducer = _Reducer2.default;
 exports.default = Hermes;
+"use strict";
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {

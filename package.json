@@ -1,8 +1,8 @@
 {
   "name": "@freshlysqueezedgames/hermes",
-  "version": "0.0.8",
+  "version": "0.0.10",
   "description": "independant state management pipeline",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "distribute": "babel src --out-file publish/hermes.js --ignore *.test.js && npm run minify",
     "minify": "minify publish/hermes.js --out-file publish/hermes.min.js",

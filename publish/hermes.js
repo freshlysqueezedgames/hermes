@@ -641,7 +641,25 @@ Hermes.Instance = function (name, props) {
 
 exports.Reducer = _Reducer2.default;
 exports.default = Hermes;
-"use strict";
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.Reducer = undefined;
+
+var _Reducer = require('./Reducer');
+
+var _Reducer2 = _interopRequireDefault(_Reducer);
+
+var _Hermes = require('./Hermes');
+
+var _Hermes2 = _interopRequireDefault(_Hermes);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+exports.Reducer = _Reducer2.default;
+exports.default = _Hermes2.default;
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {

@@ -1,6 +1,6 @@
 import pathToRegexp from 'path-to-regexp'
 
-import {Emitter} from '@freshlysqueezedgames/emitter'
+import Emitter from '@freshlysqueezedgames/emitter'
 
 import Action from './Action'
 import Reducer from './Reducer'

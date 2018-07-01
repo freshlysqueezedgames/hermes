@@ -1,6 +1,6 @@
 {
   "name": "@freshlysqueezedgames/hermes",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "independant state management pipeline",
   "main": "publish/hermes.min.js",
   "scripts": {
@@ -31,6 +31,6 @@
     "path-to-regexp": "^2.2.1"
   },
   "dependencies": {
-    "@freshlysqueezedgames/emitter": "0.0.5"
+    "@freshlysqueezedgames/emitter": "0.0.7"
   }
 }

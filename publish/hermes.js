@@ -45,9 +45,6 @@ var Action = function () {
 
 Action.DEFAULT = 'action.default';
 exports.default = Action;
-"use strict";
-"use strict";
-"use strict";
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -64,6 +61,8 @@ var _pathToRegexp = require('path-to-regexp');
 var _pathToRegexp2 = _interopRequireDefault(_pathToRegexp);
 
 var _emitter = require('@freshlysqueezedgames/emitter');
+
+var _emitter2 = _interopRequireDefault(_emitter);
 
 var _Action = require('./Action');
 

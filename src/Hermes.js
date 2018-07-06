@@ -5,6 +5,7 @@ import Emitter from '@freshlysqueezedgames/emitter'
 import Action from './Action'
 import Reducer from './Reducer'
 import Route from './Route'
+import Events from './Events'
 
 const {toString, hasOwnProperty} = Object.prototype
 const instances: Object = {}
@@ -40,81 +41,6 @@ function Hermes (props: Object) {
   const reducerEnds: Array = []
 
   const reducer: Reducer = new Reducer()
-
-  let events : Array = []
-  const callbacks : Object = Object.create(null)
-
-  let context : string = ""
-
-  class Events {
-    static AddEvent (name : string, payload : Object) {
-      events.push({name, payload, context})
-    }
-
-    /**
-     * Set Context In Hermes is a means of determining the path that may have lead to the change. Reducers
-     * are re-usable, and we need to be able to trigger events in a certain context.
-     * @param {*} name 
-     */
-    static SetContext (name : string) {
-      context = name
-    }
-    
-    /**
-     * @name Subscribe
-     * @description This is used to set the callbacks on what is available.
-     * @param {*} name 
-     * @param {*} callback 
-     */
-    static Subscribe (name : string, callback : Function, projection: Object) {
-      const list : Array = callbacks[name] = callbacks[name] || [] // create a new array if there isn't one
-
-      callback.projection = projection
-
-      list.push(callback)
-    }
-    
-    static Dispatch () {
-      let i : number = -1
-      let event : Object
-      
-      while ((event = events[++i])) {
-        if (!callbacks[event.name]) {
-          continue
-        }
-
-        const list : Array = callbacks[event.name]
-
-        let j : number = -1
-        let callback
-
-        while ((callback = list[++j])) {
-          let content : Object = Object.create(null)
-
-          if (callback.projection) {
-            for (let key in callback.projection) {
-              const item : Array = callback.projection[key]
-              let target : any = event.payload
-              let i : number = 0
-              const l : number = item.length
-
-              while((target = target[item[i++]]) && i < l);
-
-              content[key] = target
-            }
-          } else {
-            content = event
-          }
-
-          if (callback(content, event.context)) {
-            list.splice(j--, 1)
-          }
-        }
-      }
-
-      events = []
-    }
-  }
 
   reducer.Events = function () {
     return Events
@@ -193,7 +119,7 @@ function Hermes (props: Object) {
       return instance || new Hermes(props)
     }
 
-    Subscribe (name: string, callback: Function, projection: Object): Hermes {
+    Subscribe (name: string, callback: Function, context : string, projection: Object): Hermes {
       const t: Hermes = this
 
       if (!name || typeof name !== 'string' || toString.call(callback) !== '[object Function]') {
@@ -213,7 +139,7 @@ function Hermes (props: Object) {
         projection[key] = projection[key].split('/')
       }
 
-      Events.Subscribe(name, callback, projection)
+      Events.Subscribe(name, callback, context, projection)
 
       return t
     }
@@ -242,8 +168,6 @@ function Hermes (props: Object) {
           break
         }
       }
-
-      console.log('thats a nice thing!', pathToRegexp, path, action.content)
 
       // one time call for the first request of the data
       return Query.call(t, pathToRegexp.compile(path)(action.context), action)

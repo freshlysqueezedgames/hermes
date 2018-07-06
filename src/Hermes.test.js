@@ -30,33 +30,62 @@ class TestReducer extends Reducer {
 }
 
 describe('#Hermes', () => {
+  const testReducer : TestReducer = new TestReducer
+  const hermes : Hermes = Hermes({
+    name : 'test',
+    reducers : {
+      test : testReducer
+    }
+  })
+
   test ('Should be able to add plain data', (done : Function) => {
-    const testReducer : TestReducer = new TestReducer
-    const hermes : Hermes = new Hermes({
-      name : 'test',
-      reducers : {
-        test : testReducer
-      }
-    })
-    
+    console.log('adding the event1')
+
     hermes.Subscribe(TestReducer.EVENTS.CHANGE, (result: Object) => {
       const {name, payload, context} = result
 
-      console.log('thats the best way', name, payload, context)
+      console.log('thats the best way 1', name, payload, context, result)
 
       expect(name).to.be.a('string')
       expect(payload).to.be.an('object')
       expect(context).to.be.an('string')
 
       expect(name).to.equal('testreducer.change', 'Event name has not been preserved')
-      expect(payload).to.have.property('test', 'test', 'Data has not mutated properly')
+      expect(payload).to.have.deep.property('target', {test : 'test'}, 'Data has not mutated properly')
       expect(context).to.equal('test', 'Returns the wrong path')
 
       done()
-    })
+
+      return true // important! unsubscribe or this will be invoked
+    }, 'test')
 
     hermes.Do(testReducer.Set({
       test: 'test'
+    }))
+  })
+
+  test ('Should be able to subscribe to specific projection', (done : Function) => {    
+
+    console.log('adding the event2')
+
+    hermes.Subscribe(TestReducer.EVENTS.CHANGE, (result: Object) => {
+      const {name, payload, context} = result
+
+      expect(name).to.be.a('string')
+      expect(payload).to.be.an('object')
+      expect(context).to.be.an('string')
+
+      expect(name).to.equal('testreducer.change', 'Event name has not been preserved')
+      expect(payload).to.have.property('test', 'test2', 'Data has not mutated properly')
+      expect(context).to.equal('test', 'Returns the wrong path')
+
+      done()
+
+      return true
+    }, 'test', {test : 'target/test'})
+
+    hermes.Do(testReducer.Set({
+      test: 'test2'
     }))
   })
 })

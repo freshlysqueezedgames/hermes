@@ -243,6 +243,8 @@ function Hermes (props: Object) {
         }
       }
 
+      console.log('thats a nice thing!', pathToRegexp, path, action.content)
+
       // one time call for the first request of the data
       return Query.call(t, pathToRegexp.compile(path)(action.context), action)
     }

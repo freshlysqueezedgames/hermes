@@ -342,10 +342,15 @@ function Hermes (props: Object) {
       let member : any
 
       while ((member = heap[++i])) {
+        if (typeof member !== 'object') {
+          continue
+        }
+
         const childKeys : Array = [...keys, i]
         const typeString : string = toString.call(member)
 
-        target[i] = Tree(onNode(target[i] || (typeString === '[object Array]' ? new Array(member.length) : Object.create(null)), member, childKeys), member, onNode, childKeys)
+        target[i] = Tree(target[i] || (typeString === '[object Array]' ? new Array(member.length) : Object.create(null)), member, onNode, childKeys)
+        target[i] = onNode(target[i], member, childKeys)
       }
 
       return target
@@ -358,7 +363,8 @@ function Hermes (props: Object) {
       if (typeString === '[object Object]' || typeString === '[object Array]') {
         const childKeys: Array = [...keys, key]
 
-        target[key] = Tree(onNode(target[key] || (typeString === '[object Array]' ? new Array(node.length) : Object.create(null)), node, childKeys), node, onNode, childKeys)
+        target[key] = Tree(target[key] || (typeString === '[object Array]' ? new Array(node.length) : Object.create(null)), node, onNode, childKeys)
+        target[key] = onNode(target[key], node, childKeys)
       }
     }
 

@@ -17,9 +17,13 @@ class TestReducer extends Reducer {
   Reduce (action: Action, state: Object = {}, payload: Object): Object {
     const t : TestReducer = this
     const {context} = action
+    console.log('bugger me!', state, payload)
+
     const newState : Object = {...state, ...payload}
 
     t.Dispatch(TestReducer.EVENTS.CHANGE, newState)
+
+    console.log('this is the new state', newState)
 
     return newState
   }
@@ -34,7 +38,7 @@ describe('#Hermes', () => {
   const hermes : Hermes = Hermes({
     name : 'test',
     reducers : {
-      test : testReducer
+     'test' : testReducer
     }
   })
 
@@ -86,6 +90,32 @@ describe('#Hermes', () => {
 
     hermes.Do(testReducer.Set({
       test: 'test2'
+    }))
+  })
+
+  test ('Will not modify values in an array', (done : Function) => {    
+    hermes.Subscribe(TestReducer.EVENTS.CHANGE, (result: Object) => {
+      const {name, payload, context} = result
+
+      console.log('find me a cheese sandwich', name, payload, context)
+
+      expect(name).to.be.a('string')
+      expect(payload).to.be.an('object')
+      expect(context).to.be.an('string')
+
+      expect(name).to.equal('testreducer.change', 'Event name has not been preserved')
+      expect(payload).to.have.deep.property('test2', [1, 2, 3], 'Data has not mutated properly')
+      expect(context).to.equal('test', 'Returns the wrong path')
+
+      done()
+
+      return true
+    }, 'test', {test2 : 'target/test2'})
+
+    console.log('change damn you!')
+
+    hermes.Do(testReducer.Set({
+      test2: [1, 2, 3]
     }))
   })
 })

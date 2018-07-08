@@ -51,8 +51,6 @@ class Reducer {
       return [...payload]
     }
 
-    console.log('mending', state, payload)
-
     return {...state, ...payload}
   }
 

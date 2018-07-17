@@ -65,7 +65,7 @@ function Hermes (props: Object) {
         throw new Error('Hermes already exists, please use Hermes.Instance() to get the singleton')
       }
 
-      props = {...props, ...Hermes.DEFAULTS}
+      props = {...Hermes.DEFAULTS, ...props}
 
       if (props.paths) {
         props.paths = OrderByLongest(props.paths)
@@ -92,14 +92,14 @@ function Hermes (props: Object) {
         props.reducers = OrderByLongest(props.reducers)
 
         for (let key in props.reducers) {
-          const reducer: Reducer = props.reducers[key]
+          const targetReducer: Reducer = props.reducers[key]
 
-          if (!(reducer instanceof Reducer)) {
+          if (!(targetReducer instanceof Reducer)) {
             throw new Error('Property at path: ', key, ' is not a Reducer instance!')
           }
 
           // Bind a function for accessing the events list. There is one list per Hermes.
-          reducer.Events = function () {
+          targetReducer.Events = function () {
             return Events
           }
 
@@ -112,8 +112,8 @@ function Hermes (props: Object) {
 
           reducerEnds.push(current)
 
-          current.reducer = reducer
-          reducer.path = key
+          current.reducer = targetReducer
+          targetReducer.path = key
         }
       } else if (props.verbose) {
         console.warn('No reducers have been defined for the instance, this means all data will be copied as submitted in action payloads: ', props.name)
@@ -123,6 +123,11 @@ function Hermes (props: Object) {
       
       t.verbose = props.verbose || false
       t.paths = props.paths || false
+
+      t.host = props.host
+      t.protocol = props.protocol
+      t.port = props.port
+      t.endPoint = props.endPoint
     }
 
     static Instance (props?: Object): Hermes {
@@ -164,13 +169,13 @@ function Hermes (props: Object) {
       // We look at the instance, and determine our path based on the reducer instance associated with the action
       let i: number = reducerEnds.length
       let path: string
-      const reducer: Reducer = action.Reducer()
+      const targetReducer: Reducer = action.Reducer()
 
       // Match the reducer
       while (i--) {
         const reducerEnd: Reducer = reducerEnds[i].reducer
 
-        if (reducer === reducerEnd) {
+        if (targetReducer === reducerEnd) {
           path = reducerEnd.path
 
           // notify reducer of submission
@@ -289,8 +294,8 @@ function Hermes (props: Object) {
       const {protocol, host, port, endPoint} = t
 
       request.open('GET', `${protocol}://${host}:${port}/${endPoint}`)
-      request.setRequestHeader('X-Query', btoa(encodeURIComponent(result.config.query)))
-      request.setRequestHeader('X-Params', btoa(encodeURIComponent('{}')))
+      request.setRequestHeader('Query', btoa(result.config.query))
+      request.setRequestHeader('Params', btoa(JSON.stringify({})))
 
       request.onload = () => {
         const payload : Object = JSON.parse(request.response)
@@ -336,7 +341,6 @@ function Hermes (props: Object) {
     // payloads exist because we are now in the returned object heap. 
     Tree(store, action.payload, (node : Object, payload : Object, keys : Array) : Object => {
       const path : Array = [...steps, ...keys]
-
       const {result} = Trace.call(t, path, reducerEnds, true) // look for an exact path match in the reducers
 
       Events.SetContext(path.join('/'))
@@ -362,8 +366,8 @@ function Hermes (props: Object) {
         const childKeys : Array = [...keys, i]
         const typeString : string = toString.call(member)
 
-        target[i] = Tree(target[i] || (typeString === '[object Array]' ? new Array(member.length) : Object.create(null)), member, onNode, childKeys)
         target[i] = onNode(target[i], member, childKeys)
+        target[i] = Tree(target[i] || (typeString === '[object Array]' ? new Array(member.length) : Object.create(null)), member, onNode, childKeys)
       }
 
       return target
@@ -376,8 +380,8 @@ function Hermes (props: Object) {
       if (typeString === '[object Object]' || typeString === '[object Array]') {
         const childKeys: Array = [...keys, key]
 
-        target[key] = Tree(target[key] || (typeString === '[object Array]' ? new Array(node.length) : Object.create(null)), node, onNode, childKeys)
         target[key] = onNode(target[key], node, childKeys)
+        target[key] = Tree(target[key] || (typeString === '[object Array]' ? new Array(node.length) : Object.create(null)), node, onNode, childKeys)
       }
     }
 

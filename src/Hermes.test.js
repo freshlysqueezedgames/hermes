@@ -17,13 +17,11 @@ class TestReducer extends Reducer {
   Reduce (action: Action, state: Object = {}, payload: Object): Object {
     const t : TestReducer = this
     const {context} = action
-    console.log('bugger me!', state, payload)
-
     const newState : Object = {...state, ...payload}
 
-    t.Dispatch(TestReducer.EVENTS.CHANGE, newState)
+    console.log('I have been called,', action, state, payload)
 
-    console.log('this is the new state', newState)
+    t.Dispatch(TestReducer.EVENTS.CHANGE, newState)
 
     return newState
   }
@@ -116,6 +114,40 @@ describe('#Hermes', () => {
 
     hermes.Do(testReducer.Set({
       test2: [1, 2, 3]
+    }))
+  })
+
+  test ('will only call a reducer once if only one exists', () => {
+    hermes.Subscribe(TestReducer.EVENTS.CHANGE, (result: Object) => {
+      const {name, payload, context} = result
+
+      console.log('find me a cheese sandwich', name, payload, context)
+
+      expect(name).to.be.a('string')
+      expect(payload).to.be.an('object')
+      expect(context).to.be.an('string')
+
+      expect(name).to.equal('testreducer.change', 'Event name has not been preserved')
+      expect(payload).to.have.deep.property('test2', [1, 2, 3], 'Data has not mutated properly')
+      expect(context).to.equal('test', 'Returns the wrong path')
+
+      done()
+
+      return true
+    }, 'test', {test2 : 'target/test2'})
+
+    console.log('change damn you!')
+
+    hermes.Do(testReducer.Set({
+      test : {
+        _id : 'test',
+        sections : [
+          {
+            tag : 'h1',
+            content : 'this is the jimbo'
+          }
+        ] 
+      }
     }))
   })
 })

@@ -295,7 +295,7 @@ function Hermes (props: Object) {
 
       request.open('GET', `${protocol}://${host}:${port}/${endPoint}`)
       request.setRequestHeader('Query', btoa(result.config.query))
-      request.setRequestHeader('Params', btoa(JSON.stringify({})))
+      request.setRequestHeader('Params', btoa(JSON.stringify(action.payload)))
 
       request.onload = () => {
         const payload : Object = JSON.parse(request.response)

@@ -26,8 +26,8 @@ class TestReducer extends Reducer {
     return newState
   }
 
-  Set (target: Object): Object {
-    return this.Action(TestReducer.ACTIONS.SET, {target})
+  Set (target: Object, context : Object): Object {
+    return this.Action(TestReducer.ACTIONS.SET, {target}, context)
   }
 }
 
@@ -36,7 +36,8 @@ describe('#Hermes', () => {
   const hermes : Hermes = Hermes({
     name : 'test',
     reducers : {
-     'test' : testReducer
+     'test' : testReducer,
+     'test/test' : testReducer
     }
   })
 

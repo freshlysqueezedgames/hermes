@@ -159,28 +159,29 @@ function Hermes (props: Object) {
       return t
     }
 
-    Do (action: Action): Promise {
+    Do (action: Action, path? : string): Promise {
       const t: Hermes = this
 
       if (!(action instanceof Action)) {
         throw new Error('Parameter 1 must be an Action instance', action)
       }
 
-      // We look at the instance, and determine our path based on the reducer instance associated with the action
-      let i: number = reducerEnds.length
-      let path: string
-      const targetReducer: Reducer = action.Reducer()
+      if (typeof path !== 'string') {
+        // We look at the instance, and determine our path based on the reducer instance associated with the action
+        let i: number = reducerEnds.length
+        const targetReducer: Reducer = action.Reducer()
 
-      // Match the reducer
-      while (i--) {
-        const reducerEnd: Reducer = reducerEnds[i].reducer
+        // Match the reducer
+        while (i--) {
+          const reducerEnd: Reducer = reducerEnds[i].reducer
 
-        if (targetReducer === reducerEnd) {
-          path = reducerEnd.path
+          if (targetReducer === reducerEnd) {
+            path = reducerEnd.path
 
-          // notify reducer of submission
-          reducerEnd.Submission(action)
-          break
+            // notify reducer of submission
+            reducerEnd.Submission(action)
+            break
+          }
         }
       }
 

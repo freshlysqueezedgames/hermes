@@ -3,7 +3,7 @@ const {toString} = Object.prototype
 class Action {
   static DEFAULT : string = 'action.default'
 
-  constructor (name : string, payload : Object = Object.create(null), context : Object = Object.create(null), method? : string) {
+  constructor (name : string, payload : Object = Object.create(null), context : Object = Object.create(null)) {
     const t : Action = this
 
     if (!name || typeof name !== 'string') {

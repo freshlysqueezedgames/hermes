@@ -1,15 +1,11 @@
-import io from 'socket'
 import pathToRegexp from 'path-to-regexp'
 
-import Emitter from '@/core/Emitter'
-import Message from '@/core/Message'
+import Emitter from '@freshlysqueezedgames/emitter'
 
 import Action from './Action'
 import Reducer from './Reducer'
 import Route from './Route'
-
-const message: Message = Message.Instance()
-const socket: SocketIO = io()
+import Events from './Events'
 
 const {toString, hasOwnProperty} = Object.prototype
 const instances: Object = {}
@@ -46,81 +42,6 @@ function Hermes (props: Object) {
 
   const reducer: Reducer = new Reducer()
 
-  let events : Array = []
-  const callbacks : Object = Object.create(null)
-
-  let context : string = ""
-
-  class Events {
-    static AddEvent (name : string, payload : Object) {
-      events.push({name, payload, context})
-    }
-
-    /**
-     * Set Context In Hermes is a means of determining the path that may have lead to the change. Reducers
-     * are re-usable, and we need to be able to trigger events in a certain context.
-     * @param {*} name 
-     */
-    static SetContext (name : string) {
-      context = name
-    }
-    
-    /**
-     * @name Subscribe
-     * @description This is used to set the callbacks on what is available.
-     * @param {*} name 
-     * @param {*} callback 
-     */
-    static Subscribe (name : string, callback : Function, projection: Object) {
-      const list : Array = callbacks[name] = callbacks[name] || [] // create a new array if there isn't one
-
-      callback.projection = projection
-
-      list.push(callback)
-    }
-    
-    static Dispatch () {
-      let i : number = -1
-      let event : Object
-      
-      while ((event = events[++i])) {
-        if (!callbacks[event.name]) {
-          continue
-        }
-
-        const list : Array = callbacks[event.name]
-
-        let j : number = -1
-        let callback
-
-        while ((callback = list[++j])) {
-          let content : Object = Object.create(null)
-
-          if (callback.projection) {
-            for (let key in callback.projection) {
-              const item : Array = callback.projection[key]
-              let target : any = event.payload
-              let i : number = 0
-              const l : number = item.length
-
-              while((target = target[item[i++]]) && i < l);
-
-              content[key] = target
-            }
-          } else {
-            content = event
-          }
-
-          if (callback(content, event.context)) {
-            list.splice(j--, 1)
-          }
-        }
-      }
-
-      events = []
-    }
-  }
-
   reducer.Events = function () {
     return Events
   }
@@ -132,10 +53,19 @@ function Hermes (props: Object) {
    * trigger changes in the Store (including from the server) and views can subscribe to object changes in the heap(s)
   */
   class Hermes {
+    static DEFAULTS : Object = {
+      protocol : 'http',
+      host : '127.0.0.1',
+      port : '80',
+      endPoint : 'arc'
+    }
+
     constructor (props: Object) {
       if (instance) {
         throw new Error('Hermes already exists, please use Hermes.Instance() to get the singleton')
       }
+
+      props = {...Hermes.DEFAULTS, ...props}
 
       if (props.paths) {
         props.paths = OrderByLongest(props.paths)
@@ -145,6 +75,7 @@ function Hermes (props: Object) {
 
           const current: Object = Branch(paths, key.split('/'), (node : Object, step : string, i : number) => {
             node.step = step
+
             node.position = i + 1
 
             return node
@@ -161,14 +92,14 @@ function Hermes (props: Object) {
         props.reducers = OrderByLongest(props.reducers)
 
         for (let key in props.reducers) {
-          const reducer: Reducer = props.reducers[key]
+          const targetReducer: Reducer = props.reducers[key]
 
-          if (!(reducer instanceof Reducer)) {
+          if (!(targetReducer instanceof Reducer)) {
             throw new Error('Property at path: ', key, ' is not a Reducer instance!')
           }
 
           // Bind a function for accessing the events list. There is one list per Hermes.
-          reducer.Events = function () {
+          targetReducer.Events = function () {
             return Events
           }
 
@@ -181,8 +112,8 @@ function Hermes (props: Object) {
 
           reducerEnds.push(current)
 
-          current.reducer = reducer
-          reducer.path = key
+          current.reducer = targetReducer
+          targetReducer.path = key
         }
       } else if (props.verbose) {
         console.warn('No reducers have been defined for the instance, this means all data will be copied as submitted in action payloads: ', props.name)
@@ -192,13 +123,18 @@ function Hermes (props: Object) {
       
       t.verbose = props.verbose || false
       t.paths = props.paths || false
+
+      t.host = props.host
+      t.protocol = props.protocol
+      t.port = props.port
+      t.endPoint = props.endPoint
     }
 
     static Instance (props?: Object): Hermes {
       return instance || new Hermes(props)
     }
 
-    Subscribe (name: string, callback: Function, projection: Object): Hermes {
+    Subscribe (name: string, callback: Function, context : string, projection: Object): Hermes {
       const t: Hermes = this
 
       if (!name || typeof name !== 'string' || toString.call(callback) !== '[object Function]') {
@@ -218,33 +154,34 @@ function Hermes (props: Object) {
         projection[key] = projection[key].split('/')
       }
 
-      Events.Subscribe(name, callback, projection)
+      Events.Subscribe(name, callback, context, projection)
 
       return t
     }
 
-    Do (action: Action): Promise {
+    Do (action: Action, path? : string): Promise {
       const t: Hermes = this
 
       if (!(action instanceof Action)) {
         throw new Error('Parameter 1 must be an Action instance', action)
       }
 
-      // We look at the instance, and determine our path based on the reducer instance associated with the action
-      let i: number = reducerEnds.length
-      let path: string
-      const reducer: Reducer = action.Reducer()
+      if (typeof path !== 'string') {
+        // We look at the instance, and determine our path based on the reducer instance associated with the action
+        let i: number = reducerEnds.length
+        const targetReducer: Reducer = action.Reducer()
 
-      // Match the reducer
-      while (i--) {
-        const reducerEnd: Reducer = reducerEnds[i].reducer
+        // Match the reducer
+        while (i--) {
+          const reducerEnd: Reducer = reducerEnds[i].reducer
 
-        if (reducer === reducerEnd) {
-          path = reducerEnd.path
+          if (targetReducer === reducerEnd) {
+            path = reducerEnd.path
 
-          // notify reducer of submission
-          reducerEnd.Submission(action)
-          break
+            // notify reducer of submission
+            reducerEnd.Submission(action)
+            break
+          }
         }
       }
 
@@ -355,8 +292,11 @@ function Hermes (props: Object) {
       // We need to be able to deviate here based on the type of request. Either it will follow a REST style system or GraphQL style system
       // http://127.0.0.1:3000/arc?query=%23%20Welcome%20to%20GraphiQL%0A%23%0A%23%20GraphiQL%20is%20an%20in-browser%20tool%20for%20writing%2C%20validating%2C%20and%0A%23%20testing%20GraphQL%20queries.%0A%23%0A%23%20Type%20queries%20into%20this%20side%20of%20the%20screen%2C%20and%20you%20will%20see%20intelligent%0A%23%20typeaheads%20aware%20of%20the%20current%20GraphQL%20type%20schema%20and%20live%20syntax%20and%0A%23%20validation%20errors%20highlighted%20within%20the%20text.%0A%23%0A%23%20GraphQL%20queries%20typically%20start%20with%20a%20%22%7B%22%20character.%20Lines%20that%20starts%0A%23%20with%20a%20%23%20are%20ignored.%0A%23%0A%23%20An%20example%20GraphQL%20query%20might%20look%20like%3A%0A%23%0A%23%20%20%20%20%20%7B%0A%23%20%20%20%20%20%20%20field(arg%3A%20%22value%22)%20%7B%0A%23%20%20%20%20%20%20%20%20%20subField%0A%23%20%20%20%20%20%20%20%7D%0A%23%20%20%20%20%20%7D%0A%23%0A%23%20Keyboard%20shortcuts%3A%0A%23%0A%23%20%20Prettify%20Query%3A%20%20Shift-Ctrl-P%20(or%20press%20the%20prettify%20button%20above)%0A%23%0A%23%20%20%20%20%20%20%20Run%20Query%3A%20%20Ctrl-Enter%20(or%20press%20the%20play%20button%20above)%0A%23%0A%23%20%20%20Auto%20Complete%3A%20%20Ctrl-Space%20(or%20just%20start%20typing)%0A%23%0A%0Aquery%20Scene%20(%24application%3AString%20%3D%20%22fiercesprout%22%2C%20%24scene%3AString%3D%22scene1%22)%7B%0A%20%20scene%20(application%3A%24application%2C%20scene%3A%24scene)%7B%0A%20%20%20%20title%0A%20%20%20%20world%20%7B%0A%20%20%20%20%20%20width%0A%20%20%20%20%20%20height%0A%20%20%20%20%20%20unit%0A%20%20%20%20%20%20minVertexX%0A%20%20%20%20%20%20minVertexY%0A%20%20%20%20%20%20maxVertexX%0A%20%20%20%20%20%20maxVertexY%0A%20%20%20%20%7D%0A%20%20%20%20layerDef%7B%0A%20%20%20%20%20%20target%0A%20%20%20%20%20%20worldObject%7B%0A%20%20%20%20%20%20%20%20name%0A%20%20%20%20%20%20%20%20component%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%7D%0A%20%20%7D%0A%7D&operationName=Scene
       const request : XMLHttpRequest = new XMLHttpRequest()
+      const {protocol, host, port, endPoint} = t
 
-      request.open('GET', './arc?query=' + encodeURIComponent(result.config.query))
+      request.open('GET', `${protocol}://${host}:${port}/${endPoint}`)
+      request.setRequestHeader('Query', btoa(result.config.query))
+      request.setRequestHeader('Params', btoa(JSON.stringify(action.payload)))
 
       request.onload = () => {
         const payload : Object = JSON.parse(request.response)
@@ -402,7 +342,6 @@ function Hermes (props: Object) {
     // payloads exist because we are now in the returned object heap. 
     Tree(store, action.payload, (node : Object, payload : Object, keys : Array) : Object => {
       const path : Array = [...steps, ...keys]
-
       const {result} = Trace.call(t, path, reducerEnds, true) // look for an exact path match in the reducers
 
       Events.SetContext(path.join('/'))
@@ -421,10 +360,15 @@ function Hermes (props: Object) {
       let member : any
 
       while ((member = heap[++i])) {
+        if (typeof member !== 'object') {
+          continue
+        }
+
         const childKeys : Array = [...keys, i]
         const typeString : string = toString.call(member)
 
-        target[i] = Tree(onNode(target[i] || (typeString === '[object Array]' ? new Array(member.length) : Object.create(null)), member, childKeys), member, onNode, childKeys)
+        target[i] = onNode(target[i], member, childKeys)
+        target[i] = Tree(target[i] || (typeString === '[object Array]' ? new Array(member.length) : Object.create(null)), member, onNode, childKeys)
       }
 
       return target
@@ -437,7 +381,8 @@ function Hermes (props: Object) {
       if (typeString === '[object Object]' || typeString === '[object Array]') {
         const childKeys: Array = [...keys, key]
 
-        target[key] = Tree(onNode(target[key] || (typeString === '[object Array]' ? new Array(node.length) : Object.create(null)), node, childKeys), node, onNode, childKeys)
+        target[key] = onNode(target[key], node, childKeys)
+        target[key] = Tree(target[key] || (typeString === '[object Array]' ? new Array(node.length) : Object.create(null)), node, onNode, childKeys)
       }
     }
 

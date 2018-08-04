@@ -42,6 +42,8 @@ class Reducer {
    */
   Reduce (action : Action, state : Object | Array = Object.create(null), payload : Array | Object = Object.create(null)) : Object | Array {
     const t : Reducer = this
+
+    console.log('hello!');
     
     if (toString.call(state) === '[object Array]') {
       if (state.length === payload.length) {

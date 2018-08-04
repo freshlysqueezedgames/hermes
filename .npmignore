@@ -4,3 +4,4 @@
 **/.vscode
 **/.babelrc
 **/.eslintrc
+**/coverage

@@ -4,15 +4,14 @@ const {toString} = Object.prototype
 
 let id : number = 0
 
-class Reducer {
+export default class Reducer {
   static EVENTS : Object = {
     CHANGE : 'reducer.change'
   }
   
-  constructor (actions? : Object) {
+  constructor () {
     const t : Reducer = this
 
-    t.actions = actions || {}
     t.path = ""
     t.Events = null
 
@@ -83,5 +82,3 @@ class Reducer {
     this.Events().AddEvent(eventName, data)
   }
 }
-
-export default Reducer

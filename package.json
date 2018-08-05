@@ -12,7 +12,8 @@
   },
   "keywords": [
     "Flux",
-    "State"
+    "State",
+    "Store"
   ],
   "author": "Carl Pryke (Freshly Squeezed Games LTD)",
   "license": "MIT",
@@ -31,7 +32,6 @@
     "eslint": "^5.0.1"
   },
   "dependencies": {
-    "@freshlysqueezedgames/emitter": "0.0.10",
     "path-to-regexp": "^2.2.1"
   }
 }

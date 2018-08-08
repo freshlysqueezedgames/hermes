@@ -104,7 +104,7 @@ describe('#Hermes', () => {
       expect(event.payload).toMatchObject({test : 'test'})
 
       expect(event).toHaveProperty('context')
-      expect(event.context).toStrictEqual(undefined)
+      expect(event.context).toStrictEqual('test/test')
 
       done()
     })
@@ -142,9 +142,11 @@ describe('#Hermes', () => {
       expect(event.payload).toEqual(expect.arrayContaining([1,2,3]))
 
       expect(event).toHaveProperty('context')
-      expect(event.context).toStrictEqual(undefined)
+      expect(event.context).toStrictEqual('test/test')
 
       done()
+
+      return true
     })
 
     hermes.Do(testArrayReducer.Change([1, 2, 3]))
@@ -160,5 +162,117 @@ describe('#Hermes', () => {
 
     expect(target).toHaveLength(3)
     expect(target).toEqual(expect.arrayContaining([1,2,3]))
+  })
+
+  test('Multiple reducers should only fire events on the deepest reducer if no specific context', (done : Function) => {
+    const testReducer : TestReducer = new TestReducer
+
+    const hermes : Hermes = new Hermes({
+      reducers : {
+        'test' : testReducer,
+        'test/test' : testReducer
+      }
+    })
+
+    const data : Object = {
+      test : 'test'
+    }
+
+    const mock : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
+      expect(event.payload).toMatchObject(data)
+      done()
+    })
+
+    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, mock)
+    hermes.Do(testReducer.Change(data))
+
+    expect(mock).toHaveBeenCalledTimes(1)
+    expect(mock).toH
+  })
+
+  test('Multiple reducers should only fire events on the router at an exact path if a context is defined', (done : Function) => {
+    const testReducer : TestReducer = new TestReducer
+
+    const hermes : Hermes = new Hermes({
+      reducers : {
+        'test' : testReducer,
+        'test/test' : testReducer
+      }
+    })
+
+    const data : Object = {
+      test : 'test'
+    }
+
+    const correctMock : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
+      expect(event.payload).toMatchObject(data)
+      done()
+    })
+
+    const incorrectMock : Jest.Mock = jest.fn()
+
+    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, correctMock, 'test')
+    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, incorrectMock, 'test/test')
+
+    hermes.Do(testReducer.Change(data), 'test')
+
+    expect(correctMock).toHaveBeenCalledTimes(1)
+    expect(incorrectMock).not.toHaveBeenCalled()
+  })
+
+  test('Multiple reducers should only fire events on the router at an exact path if a context is defined', (done : Function) => {
+    const testReducer : TestReducer = new TestReducer
+
+    const hermes : Hermes = new Hermes({
+      reducers : {
+        'test' : testReducer,
+        'test/test' : testReducer
+      }
+    })
+
+    const data : Object = {
+      test : 'test'
+    }
+
+    const correctMock : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
+      expect(event.payload).toMatchObject(data)
+      done()
+    })
+
+    const incorrectMock : Jest.Mock = jest.fn()
+
+    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, correctMock, 'test')
+    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, incorrectMock, 'test/test')
+
+    hermes.Do(testReducer.Change(data), 'test')
+
+    expect(correctMock).toHaveBeenCalledTimes(1)
+    expect(incorrectMock).not.toHaveBeenCalled()
+  })
+
+  // We should get a map indicating the path variable and its value.
+  test('Generalised paths should return some parameters based on call path and reducer path', (done : Function) => {
+    const testReducer : TestReducer = new TestReducer
+
+    const hermes : Hermes = new Hermes({
+      reducers : {
+        'test/:place' : testReducer
+      }
+    })
+
+    const data : Object = {
+      test : 'test'
+    }
+
+    const mock : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
+      console.log('well thats cheesy', event)
+      expect(event.payload).toMatchObject(data)
+      done()
+    })
+
+    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, mock, 'test/test')
+    hermes.Do(testReducer.Change(data), 'test/test')
+
+    expect(mock).toHaveBeenCalledTimes(1)
   })
 })

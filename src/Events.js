@@ -9,7 +9,7 @@ export default class Events {
 
 
   AddEvent (name : string, payload : Object, context : Object) {
-    this.events.push({name, payload, context})
+    this.events.push({name, payload, context : this.context})
   }
 
   /**
@@ -17,8 +17,9 @@ export default class Events {
    * are re-usable, and we need to be able to trigger events in a certain context.
    * @param {*} name 
    */
-  SetContext (name : string) {
+  SetContext (name : string, params : Object) {
     this.context = name
+    this.params = params
   }
   
   /**
@@ -41,6 +42,8 @@ export default class Events {
     const t : Events = this
     let i : number = -1
     let event : Object
+
+    console.log('dispatching for!', t.events)
 
     while ((event = t.events[++i])) {
       if (!t.callbacks[event.name]) {

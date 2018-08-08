@@ -79,6 +79,7 @@ export default class Reducer {
    * @param {Object} data 
    */
   Dispatch (eventName : string, data : Object) {
+    console.log('my path is!', this)
     this.Events().AddEvent(eventName, data)
   }
 }

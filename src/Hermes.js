@@ -85,7 +85,7 @@ export default class Hermes {
           return t.events
         }
 
-        const current: Object = t.Branch(t.reducerHeap, key.split('/'), (node, step, i) => {
+        const current: Object = t.Branch(t.reducerHeap, key.split('/'), (node : Object, step : string, i : number) => {
           node.step = step
           node.position = i + 1
 
@@ -111,8 +111,7 @@ export default class Hermes {
     const t: Hermes = this
 
     if (!name || typeof name !== 'string' || toString.call(callback) !== FUNCTION) {
-      console.warn('you must always call Subscribe with a string path and a callback function', name, callback)
-      return t
+      throw new Error('you must always call Subscribe with a string path and a callback function')
     }
 
     for (let key in projection) {
@@ -239,8 +238,6 @@ export default class Hermes {
         resolve && resolve()
       }
 
-      console.log('requestpath?', requestPath)
-
       if (!requestPath) {
         // this is not a requestable piece of data!
         OnApply(action.payload)
@@ -322,7 +319,7 @@ export default class Hermes {
     const t : Hermes = this
 
     if (toString.call(heap) === ARRAY) {
-      let i : number = -1 
+      let i : number = -1
       let member : any
 
       while ((member = heap[++i])) {

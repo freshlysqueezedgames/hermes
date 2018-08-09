@@ -152,8 +152,6 @@ export default class Hermes {
       let callback
 
       while ((callback = list[++j])) {
-        console.log('me?', callback.path, event.path)
-
         if (callback.path && callback.path !== event.path) {
           continue
         }

@@ -9,7 +9,7 @@ Hermes is currently built to handle GraphQL communication, but I will be abstrac
 
 ** Currently In Development, Not Fully Featured as of Yet **
 
-## Hermes
+## Hermes Class
 
 Hermes acts as your container for a state heap (store), you can have as many or as few as you want, the only caveat is whereever you decide to manage your store should be a wrapper in a way so as to be exposed singularly to the rendering framework heap. You can achieve this as follows, but you may have your own pattern you like to follow:
 
@@ -57,7 +57,7 @@ What Hermes attempts to achieve is to turn your state heap into a set of address
     }
   }
 
-  const addressToC : string = 'a/b/c'
+  const addressToC : string = 'a/b/c' // this path would generate the above
 
 ```
 
@@ -114,5 +114,151 @@ store.Subscribe(..., (event : Object) => {
 
 ```
 
+You invoke an action using the Do method, and must pass it an action that has been created via your reducer:
 
+```javascript
 
+store.Do(myReducer.MyAction({some : data}))
+
+```
+
+Actions are always created via your reducer. See Reducer section
+
+When passing your Reducers to Hermes, remember that a reducer at any path must be unique, as this helps to improve lookup considerably. Hermes will throw if you attempt to use an instance
+twice, even across multiple Hermes instances
+
+```javascript
+
+const myReducer : MyReducer = new MyReducer
+
+const store : Hermes = new Hermes({
+  reducers : {
+    'my/path' : myReducer
+  }
+})
+
+store.Do(myReducer.MyAction({some : 'data'}))
+
+```
+
+the above is the minimum setup for hermes to work, here we have created a store with the following heap:
+
+```javascript
+
+const heap : {
+  my : {
+    path : {}
+  }
+}
+
+```
+
+The instance of MyReducer will take the action payload, and apply it to the heap, assuming it just applies the payload to the state:
+
+```javascript
+
+const heap : {
+  my : {
+    path : {
+      some : 'data'
+    }
+  }
+}
+
+```
+
+The intention is you will then have a middleware function that hermes accepts for requests, (graphql, REST) and that the resultant payload 
+from the request will be combined with any payload you pass in from the client (request payload overwriting client parameters of the same name)
+
+Say we have this:
+
+```javascript
+
+const myReducer : MyReducer = new MyReducer
+
+const store : Hermes = new Hermes({
+  paths : {
+    'my/path' : true // This path requires a request to the server
+  }
+  reducers : {
+    'my/path' : myReducer
+  }
+})
+
+store.Do(myReducer.MyAction({
+  a : 'a',
+  b : 'b'
+}))
+
+```
+
+And the payload from the request results in:
+
+```javascript
+
+const payload : Object = {
+  b : 'otherb',
+  c : 'c'
+}
+
+```
+
+Your store will look like:
+
+```javascript
+
+const heap : {
+  my : {
+    path : {
+      a : 'a',
+      b : 'otherb',
+      c : 'c'
+    }
+  }
+}
+
+```
+
+NOTE: Some thought will be applied to think about how best to manage request methods, it may be that you want to control how data is applied based on the request that is being 
+made. Also, due to the asyncronous nature of these requests, we may need an AsyncReducer class with additional reducer stages for submission (when the request sends) and errors.
+
+## Reducers
+
+Rather than being single functions, these are now class instances that are responsible for:
+
+* Reducing the state based on a given action payload
+* Creation of actions
+* Creation of events as a result of actions
+
+Creating a Reducer is pretty straight forward:
+
+```javascript
+
+class MyReducer extends Reducer {
+  static ACTIONS : Object = { // Setup an index of actions
+    CHANGE : 'testreducer.change'
+  }
+  
+  static EVENTS : Object = { // Also an index of events
+    CHANGE : 'testreducer.change'
+  }
+
+  // Overwrite the Reducer function, which accepts the action, the state and the payload
+  Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
+    const newState : Object = {...state, ...payload}
+  
+    this.Dispatch(TestReducer.EVENTS.CHANGE, newState) // dispatch your event, which will be passed to listening subscribers
+
+    return newState
+  }
+
+  Change (payload : Object) { // Create functions that invoke actions. Actions are created with the reducers base class and must be built this way.
+    return this.Action(TestReducer.ACTIONS.CHANGE, payload)
+  }
+}
+
+```
+
+NOTE: It is intended that Events will not deliver the new state in this fashion, this will be handled by hermes so the second parameter will no longer exist
+
+More To Come, Stay Tuned!

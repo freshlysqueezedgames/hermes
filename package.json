@@ -1,6 +1,6 @@
 {
   "name": "@freshlysqueezedgames/hermes",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "independant state management pipeline",
   "main": "dist/index.js",
   "scripts": {
@@ -10,14 +10,17 @@
     "lint": "",
     "test": "npm run build && jest dist --coverage"
   },
+  "url" : "https://github.com/freshlysqueezedgames/hermes",
   "keywords": [
     "Flux",
-    "State"
+    "State",
+    "Store"
   ],
   "author": "Carl Pryke (Freshly Squeezed Games LTD)",
   "license": "MIT",
   "devDependencies": {
     "babel-core": "^6.26.3",
+    "babel-jest": "^23.4.2",
     "babel-plugin-transform-class-properties": "^6.24.1",
     "babel-plugin-transform-es2015-destructuring": "^6.23.0",
     "babel-plugin-transform-es2015-template-literals": "^6.22.0",
@@ -31,7 +34,6 @@
     "eslint": "^5.0.1"
   },
   "dependencies": {
-    "@freshlysqueezedgames/emitter": "0.0.10",
     "path-to-regexp": "^2.2.1"
   }
 }

@@ -103,8 +103,8 @@ describe('#Hermes', () => {
       expect(event).toHaveProperty('payload')
       expect(event.payload).toMatchObject({test : 'test'})
 
-      expect(event).toHaveProperty('context')
-      expect(event.context).toStrictEqual('test/test')
+      expect(event).toHaveProperty('path')
+      expect(event.path).toStrictEqual('test/test')
 
       done()
     })
@@ -141,8 +141,8 @@ describe('#Hermes', () => {
       expect(event).toHaveProperty('payload')
       expect(event.payload).toEqual(expect.arrayContaining([1,2,3]))
 
-      expect(event).toHaveProperty('context')
-      expect(event.context).toStrictEqual('test/test')
+      expect(event).toHaveProperty('path')
+      expect(event.path).toStrictEqual('test/test')
 
       done()
 
@@ -164,39 +164,35 @@ describe('#Hermes', () => {
     expect(target).toEqual(expect.arrayContaining([1,2,3]))
   })
 
-  test('Multiple reducers should only fire events on the deepest reducer if no specific context', (done : Function) => {
-    const testReducer : TestReducer = new TestReducer
-
-    const hermes : Hermes = new Hermes({
+  test('Only one instance can be applied to any one route', () => {
+    let testReducer : TestReducer = new TestReducer
+    
+    expect(() => new Hermes({
       reducers : {
         'test' : testReducer,
         'test/test' : testReducer
       }
-    })
+    })).toThrowError()
 
-    const data : Object = {
-      test : 'test'
-    }
+    testReducer = new TestReducer
+    const testReducer2 : TestReducer = new TestReducer
 
-    const mock : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
-      expect(event.payload).toMatchObject(data)
-      done()
-    })
-
-    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, mock)
-    hermes.Do(testReducer.Change(data))
-
-    expect(mock).toHaveBeenCalledTimes(1)
-    expect(mock).toH
+    expect(() => new Hermes({
+      reducers : {
+        'test' : testReducer,
+        'test/test' : testReducer2
+      }
+    })).not.toThrowError()
   })
 
   test('Multiple reducers should only fire events on the router at an exact path if a context is defined', (done : Function) => {
     const testReducer : TestReducer = new TestReducer
+    const testReducer2 : TestReducer = new TestReducer
 
     const hermes : Hermes = new Hermes({
       reducers : {
         'test' : testReducer,
-        'test/test' : testReducer
+        'test/test' : testReducer2
       }
     })
 
@@ -214,7 +210,7 @@ describe('#Hermes', () => {
     hermes.Subscribe(TestReducer.ACTIONS.CHANGE, correctMock, 'test')
     hermes.Subscribe(TestReducer.ACTIONS.CHANGE, incorrectMock, 'test/test')
 
-    hermes.Do(testReducer.Change(data), 'test')
+    hermes.Do(testReducer.Change(data))
 
     expect(correctMock).toHaveBeenCalledTimes(1)
     expect(incorrectMock).not.toHaveBeenCalled()
@@ -222,11 +218,12 @@ describe('#Hermes', () => {
 
   test('Multiple reducers should only fire events on the router at an exact path if a context is defined', (done : Function) => {
     const testReducer : TestReducer = new TestReducer
+    const testReducer2 : TestReducer = new TestReducer
 
     const hermes : Hermes = new Hermes({
       reducers : {
         'test' : testReducer,
-        'test/test' : testReducer
+        'test/test' : testReducer2
       }
     })
 

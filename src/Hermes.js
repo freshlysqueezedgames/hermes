@@ -25,6 +25,11 @@ export default class Hermes {
     endPoint : 'arc'
   }
 
+  /**
+   * @constructor
+   * @description Takes the property configuration and build the store, path and reducer heaps. Keeping appropriate linear leaf references for fast lookup times
+   * @param {Object} props 
+   */
   constructor (props: Object) {
     props = {...Hermes.DEFAULTS, ...props}
 
@@ -75,26 +80,32 @@ export default class Hermes {
       props.reducers = OrderByLongest(props.reducers)
 
       for (let key in props.reducers) {
-        const targetReducer: Reducer = props.reducers[key]
+        if (hasOwnProperty.call(props.reducers, key)) {
+          const targetReducer: Reducer = props.reducers[key]
 
-        if (!(targetReducer instanceof Reducer)) {
-          throw new Error('Property at path: ', key, ' is not a Reducer instance!')
+          if (!(targetReducer instanceof Reducer)) {
+            throw new Error('Property at path: ', key, ' is not a Reducer instance!')
+          }
+
+          if (targetReducer.path !== '') {
+            throw new Error(`Reducer instances must be unique to each path for Hermes to efficiently find the correct location to allocate actions: ${key} & ${targetReducer.path} share the same instance`)
+          }
+
+          // Bind a function for accessing the events list. There is one list per Hermes.
+          targetReducer.hermes = t
+
+          const current: Object = t.Branch(t.reducerHeap, key.split('/'), (node : Object, step : string, i : number) => {
+            node.step = step
+            node.position = i + 1
+
+            return node
+          }, true)
+
+          t.reducerEnds.push(current)
+
+          current.reducer = targetReducer
+          targetReducer.path = key
         }
-
-        // Bind a function for accessing the events list. There is one list per Hermes.
-        targetReducer.hermes = t
-
-        const current: Object = t.Branch(t.reducerHeap, key.split('/'), (node : Object, step : string, i : number) => {
-          node.step = step
-          node.position = i + 1
-
-          return node
-        }, true)
-
-        t.reducerEnds.push(current)
-
-        current.reducer = targetReducer
-        targetReducer.path = key
       }
     } else if (props.verbose) {
       console.warn('No reducers have been defined for the instance, this means all data will be copied as submitted in action payloads: ', props.name)
@@ -104,26 +115,31 @@ export default class Hermes {
     t.reducer.hermes = t
   }  
 
-  AddEvent (name : string, payload : Object, context : Object) {
-    this.events.push({name, payload, context : this.context})
+  /**
+   * @name AddEvent
+   * @description The number 
+   * @param {*} name 
+   * @param {*} payload 
+   * @param {*} context 
+   */
+  AddEvent (name : string, payload : Object) {
+    this.events.push({name, payload, path : this.currentPath, context : this.context})
   }
 
   /**
-   * Set Context In Hermes is a means of determining the path that may have lead to the change. Reducers
-   * are re-usable, and we need to be able to trigger events in a certain context.
-   * @param {*} name 
+   * @name SetContext
+   * @description This marks the current path when a reducer event is fired, along with path params if the path is ambiguous
+   * @param {string} name L 
    */
-  SetContext (name : string, params : Object) {
-    this.context = name
-    this.params = params
+  SetContext (path : string, context : Object) {
+    this.currentPath = path
+    this.context = context
   }
-  
+
   Dispatch () {
     const t : Hermes = this
     let i : number = -1
     let event : Object
-
-    console.log('dispatching for!', t.events)
 
     while ((event = t.events[++i])) {
       if (!t.callbacks[event.name]) {
@@ -136,7 +152,9 @@ export default class Hermes {
       let callback
 
       while ((callback = list[++j])) {
-        if (callback.context && callback.context !== event.context) {
+        console.log('me?', callback.path, event.path)
+
+        if (callback.path && callback.path !== event.path) {
           continue
         }
 
@@ -168,7 +186,15 @@ export default class Hermes {
     t.events = []
   }
   
-  Subscribe (name: string, callback: Function, context : string, projection: Object): Hermes {
+  /**
+   * @name Subscribe
+   * @description Applies a listener to 
+   * @param {*} name 
+   * @param {*} callback 
+   * @param {*} context 
+   * @param {*} projection 
+   */
+  Subscribe (name: string, callback: Function, path : string, projection: Object): Hermes {
     const t: Hermes = this
 
     if (!name || typeof name !== 'string' || toString.call(callback) !== FUNCTION) {
@@ -181,7 +207,7 @@ export default class Hermes {
 
     const list : Array = t.callbacks[name] = t.callbacks[name] || [] // create a new array if there isn't one
 
-    callback.context = context
+    callback.path = path
     callback.projection = projection
 
     list.push(callback)
@@ -189,6 +215,14 @@ export default class Hermes {
     return t
   }
 
+  /**
+   * @name Do
+   * @description Performs an action and applies it to the heap
+   * @param {Action} action : The action to take 
+   * @param {string[Optional]} path : optionally, you can set the path to avoid the lookup cycle, this will avoid a linear lookup through the reducer list
+   * @return {Promise} A promise that resolves when the action has been executed
+   * @public
+   */
   Do (action: Action, path? : string): Promise {
     const t: Hermes = this
 
@@ -220,9 +254,13 @@ export default class Hermes {
   }
 
   /**
-   * This looks at thet.pathHeap and determines which is the closest match, working from 
-   * the leaves downwards
-   * @param {*} steps 
+   * @name Trace
+   * @description Using a list of leaves from the heap, this function will find the matching branch to a list of steps
+   * #TODO: Should store results so that if invoked multiple times we have a record of the correct path for performance
+   * @param {Array} steps : The path represented as an array of keys
+   * @param {Array[Optional]} ends : A list of leaves from a Hermes heap.
+   * @return {Object} the resultant request path if any, and the leaf
+   * @public
    */
   Trace (steps: Array, ends?: Array) {
     const t: Hermes = this
@@ -280,72 +318,63 @@ export default class Hermes {
     }
   }
 
-  Query (path: string, action: Action): Promise {
+  /**
+   * @name Query
+   * @description Takes a path and runs a server request if required. Will then apply resultant data on the Action as it's payload for the reducers
+   * @param {string} path: The path that the action will be applied to
+   * @param {Action} action: the action invoked
+   * @return {Promise}
+   * @public
+   */
+  async Query (path: string, action: Action): Promise {
     const t: Hermes = this
 
     if (t.verbose) {
       console.log('getting this path!', path)
     }
 
-    return new Promise((resolve: Function, reject: Function) => {
-      const steps: Array = path.split('/')
-      const {requestPath, result} = t.Trace(steps)
+    const steps: Array = path.split('/')
+    const {requestPath, result} = t.Trace(steps)
 
-      const OnApply: Function = (payload: Object = Object.create(null)) => {
-        action.payload = payload // Override the payload with the new one given
+    const OnApply: Function = (payload: Object = Object.create(null)) => {
+      action.payload = payload // Override the payload with the new one given
 
-        // Update the store, and ensure that the new state is in place.
-        t.Update(steps, action)
+      // Update the store, and ensure that the new state is in place.
+      t.Update(steps, action)
 
-        // This part, working in parent-first left-to-right, we should trigger any subscribers at each path within the CHANGED heap.
-        //Publish.call(t, steps, action)
-        t.Dispatch()
+      // This part, working in parent-first left-to-right, we should trigger any subscribers at each path within the CHANGED heap.
+      //Publish.call(t, steps, action)
+      t.Dispatch()
+    }
 
-        resolve && resolve()
-      }
+    if (!requestPath) {
+      // this is not a requestable piece of data!
+      OnApply(action.payload)
+      return
+    }
 
-      if (!requestPath) {
-        // this is not a requestable piece of data!
-        OnApply(action.payload)
-        return
-      }
+    steps.splice(requestPath.length)
 
-      steps.splice(requestPath.length)
+    if (t.verbose) {
+      console.log('requesting this path!', requestPath.join('/'))
+    }
 
-      if (t.verbose) {
-        console.log('requesting this path!', requestPath.join('/'))
-      }
-
-      // We need to be able to deviate here based on the type of request. Either it will follow a REST style system or GraphQL style system
-      // http://127.0.0.1:3000/arc?query=%23%20Welcome%20to%20GraphiQL%0A%23%0A%23%20GraphiQL%20is%20an%20in-browser%20tool%20for%20writing%2C%20validating%2C%20and%0A%23%20testing%20GraphQL%20queries.%0A%23%0A%23%20Type%20queries%20into%20this%20side%20of%20the%20screen%2C%20and%20you%20will%20see%20intelligent%0A%23%20typeaheads%20aware%20of%20the%20current%20GraphQL%20type%20schema%20and%20live%20syntax%20and%0A%23%20validation%20errors%20highlighted%20within%20the%20text.%0A%23%0A%23%20GraphQL%20queries%20typically%20start%20with%20a%20%22%7B%22%20character.%20Lines%20that%20starts%0A%23%20with%20a%20%23%20are%20ignored.%0A%23%0A%23%20An%20example%20GraphQL%20query%20might%20look%20like%3A%0A%23%0A%23%20%20%20%20%20%7B%0A%23%20%20%20%20%20%20%20field(arg%3A%20%22value%22)%20%7B%0A%23%20%20%20%20%20%20%20%20%20subField%0A%23%20%20%20%20%20%20%20%7D%0A%23%20%20%20%20%20%7D%0A%23%0A%23%20Keyboard%20shortcuts%3A%0A%23%0A%23%20%20Prettify%20Query%3A%20%20Shift-Ctrl-P%20(or%20press%20the%20prettify%20button%20above)%0A%23%0A%23%20%20%20%20%20%20%20Run%20Query%3A%20%20Ctrl-Enter%20(or%20press%20the%20play%20button%20above)%0A%23%0A%23%20%20%20Auto%20Complete%3A%20%20Ctrl-Space%20(or%20just%20start%20typing)%0A%23%0A%0Aquery%20Scene%20(%24application%3AString%20%3D%20%22fiercesprout%22%2C%20%24scene%3AString%3D%22scene1%22)%7B%0A%20%20scene%20(application%3A%24application%2C%20scene%3A%24scene)%7B%0A%20%20%20%20title%0A%20%20%20%20world%20%7B%0A%20%20%20%20%20%20width%0A%20%20%20%20%20%20height%0A%20%20%20%20%20%20unit%0A%20%20%20%20%20%20minVertexX%0A%20%20%20%20%20%20minVertexY%0A%20%20%20%20%20%20maxVertexX%0A%20%20%20%20%20%20maxVertexY%0A%20%20%20%20%7D%0A%20%20%20%20layerDef%7B%0A%20%20%20%20%20%20target%0A%20%20%20%20%20%20worldObject%7B%0A%20%20%20%20%20%20%20%20name%0A%20%20%20%20%20%20%20%20component%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%7D%0A%20%20%7D%0A%7D&operationName=Scene
-      const request : XMLHttpRequest = new XMLHttpRequest()
-      const {protocol, host, port, endPoint} = t
-
-      request.open('GET', `${protocol}://${host}:${port}/${endPoint}`)
-      request.setRequestHeader('Query', btoa(result.config.query))
-      request.setRequestHeader('Params', btoa(JSON.stringify(action.payload)))
-
-      request.onload = () => {
-        const payload : Object = JSON.parse(request.response)
-
-        if (payload.error) {
-          console.log('there was an error associated with this request')
-        }
-
-        OnApply({...action.payload, ...payload.data})
-      }
-
-      request.send()
-    })
+    try {
+      OnApply(await Request.call(t))
+    } catch (error) {
+      console.warn('Request failed in the network')
+    }
   }
 
   /**
-   * #TODO: For each path on the subscription list, we need to update with the data from the change.
-   * with ambiguoust.pathHeap.
-   * @param {*} steps 
-   * @param {*} action 
+   * @name Update
+   * @description This follows the designated path along each step in the heap's branch, and then applies the data
+   * heap to the store from there 
+   * @param {Array} steps: The path represented as an array of keys
+   * @param {Action} action: The action to perform on the heap
+   * @return {Hermes}
    */
-  Update (steps: Array, action: Action) {
+  Update (steps: Array, action: Action) : Hermes {
     const t: Hermes = this
 
     // we need to update the branch for the store where the path is concerned
@@ -356,7 +385,7 @@ export default class Hermes {
       const {result} = t.Trace(path, t.reducerEnds, true) // look for an exact path match in the reducers
       const payload: Object = i === steps.length - 1 ? action.payload : undefined
 
-      t.SetContext(path.join('/'))
+      t.SetContext(path.join('/'), action.context)
 
       if (!result || !result.reducer) {
         return t.reducer.Reduce(action, node, payload)
@@ -371,7 +400,7 @@ export default class Hermes {
       const path : Array = [...steps, ...keys]
       const {result} = t.Trace(path, t.reducerEnds, true) // look for an exact path match in the reducers
 
-      t.SetContext(path.join('/'))
+      t.SetContext(path.join('/'), action.context)
 
       if (!result || !result.reducer) {
         return t.reducer.Reduce(action, node, payload)
@@ -379,6 +408,8 @@ export default class Hermes {
 
       return result.reducer.Reduce(action, node, payload)
     }, t.reducerHeap)
+
+    return t
   }
 
   Tree (target: Object, heap: Object | Array, onNode?: callback, keys: Array = []) : Object {
@@ -451,4 +482,31 @@ export default class Hermes {
   Print () {
     console.log('this is the store', t.store)
   }
+}
+
+function Request () : Promise {
+  // We need to be able to deviate here based on the type of request. Either it will follow a REST style system or GraphQL style system
+  const {protocol, host, port, endPoint} = t
+
+  return new Promise ((resolve : Function, reject : Function) => {
+    const request : XMLHttpRequest = new XMLHttpRequest()
+
+    request.open('GET', `${protocol}://${host}:${port}/${endPoint}`)
+    request.setRequestHeader('Query', btoa(result.config.query))
+    request.setRequestHeader('Params', btoa(JSON.stringify(action.payload)))
+  
+    request.onload = () => {
+      const payload : Object = JSON.parse(request.response)
+  
+      if (payload.error) {
+        console.log('there was an error associated with this request')
+      }
+  
+      resolve && resolve({...action.payload, ...payload.data})
+    }
+
+    request.onerror = (error : Object) => reject && reject(error)
+  
+    request.send()
+  })
 }

@@ -10,6 +10,7 @@
     "lint": "",
     "test": "npm run build && jest dist --coverage"
   },
+  "url" : "https://github.com/freshlysqueezedgames/hermes",
   "keywords": [
     "Flux",
     "State",

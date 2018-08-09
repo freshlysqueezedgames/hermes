@@ -251,6 +251,8 @@ describe('#Hermes', () => {
   })
 
   // We should get a map indicating the path variable and its value.
+  // @carl - the problem is that paths cannot be literally matched. Paths could be matched based on the regex of certain 
+  // keys. SO we need to have a way of matching reducers with the path based on that. 
   test('Generalised paths should return some parameters based on call path and reducer path', (done : Function) => {
     const testReducer : TestReducer = new TestReducer
 

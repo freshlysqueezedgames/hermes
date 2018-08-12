@@ -1,6 +1,6 @@
 {
   "name": "@freshlysqueezedgames/hermes",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "independant state management pipeline",
   "main": "dist/index.js",
   "scripts": {
@@ -10,7 +10,10 @@
     "lint": "",
     "test": "npm run build && jest dist --coverage"
   },
-  "url" : "https://github.com/freshlysqueezedgames/hermes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/freshlysqueezedgames/hermes"
+  },
   "keywords": [
     "Flux",
     "State",

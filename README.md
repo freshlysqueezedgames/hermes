@@ -5,9 +5,66 @@ Hermes is an alternative to other flux implementations that uses paths as addres
 
 It should also be encapsulated enough that using with any DOM Rendering Framework should be intuitive and easy.
 
+It has one dependency : the [path-to-regexp](https://github.com/pillarjs/path-to-regexp) module, which has a handy syntax for writing generalised path syntax, 
+you can play around with [testing different paths here](https://forbeslindesay.github.io/express-route-tester/)
+
 Hermes is currently built to handle GraphQL communication, but I will be abstracting this in future work.
 
 ** Currently In Development, Not Fully Featured as of Yet **
+
+## Quickstart
+
+If you just want to get into using this straight away...
+
+Create your reducers like so : 
+
+```javascript
+class MyReducer extends Reducer {
+  static ACTIONS : Object = { // Setup an index of actions
+    CHANGE : 'testreducer.change'
+  }
+  
+  static EVENTS : Object = { // Also an index of events
+    CHANGE : 'testreducer.change'
+  }
+
+  // Overwrite the Reducer function, which accepts the action, the state and the payload
+  Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {  
+    this.Dispatch(TestReducer.EVENTS.CHANGE) // dispatch your event, which will be passed to listening subscribers
+
+    return {...state, ...payload}
+  }
+
+  Change (payload : Object) { // Create functions that invoke actions. Actions are created with the reducers base class and must be built this way.
+    return this.Action(TestReducer.ACTIONS.CHANGE, payload)
+  }
+}
+
+```
+
+And pass them to your Hermes instance like so:
+
+```javascript 
+
+const myReducer : MyReducer = new MyReducer
+
+const store : Hermes = new Hermes({
+  reducers : {
+    'my/path' : myReducer
+  }
+})
+
+store.Subscribe(MyReducer.EVENTS.CHANGE, (event : Object) => {
+  const {payload, context} = event
+
+  console.log(payload) // {some : 'data'}
+  console.log(context) // {path : 'path'}
+}, 'my/:path')
+
+store.Do(myReducer.Change({some : 'data'}))
+
+```
+
 
 ## Hermes Class
 
@@ -244,12 +301,10 @@ class MyReducer extends Reducer {
   }
 
   // Overwrite the Reducer function, which accepts the action, the state and the payload
-  Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
-    const newState : Object = {...state, ...payload}
-  
-    this.Dispatch(TestReducer.EVENTS.CHANGE, newState) // dispatch your event, which will be passed to listening subscribers
+  Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {  
+    this.Dispatch(TestReducer.EVENTS.CHANGE) // dispatch your event, which will be passed to listening subscribers
 
-    return newState
+    return {...state, ...payload}
   }
 
   Change (payload : Object) { // Create functions that invoke actions. Actions are created with the reducers base class and must be built this way.
@@ -259,6 +314,21 @@ class MyReducer extends Reducer {
 
 ```
 
-NOTE: It is intended that Events will not deliver the new state in this fashion, this will be handled by hermes so the second parameter will no longer exist
+### Dispatching Events
 
-More To Come, Stay Tuned!
+Unlike Redux, Events and Actions are seperated and you receive Events as a result of an invoked Action. This means you can create as many or as few events as you like within one update.
+The resultant state of the reducer will the payload that is given to Subscribed listeners, Hermes handles this for you.
+
+Default Reducers in your tree will dispatch a generic 'change' event
+
+you can reference the default change event like so:
+
+```javascript
+
+store.Subscribe(Reducer.EVENTS.CHANGE, (event : Object) => {
+  const {payload, context} = event
+
+  // do something from here.
+}, 'my/path')
+
+```

@@ -183,8 +183,7 @@ export default class Hermes {
 
           content.payload = payload
         } else {
-          console.log('me?', content, event)
-          content.payload = content.payload()
+          content.payload = content.payload() // invoke this to collect the resultant state, and remove the reference for GC
         }
 
         if (callback(content, event.context)) {
@@ -194,6 +193,10 @@ export default class Hermes {
     }
 
     t.events = []
+    t.currentPath = ''
+    
+    t.payload = null
+    t.context = null
   }
   
   /**

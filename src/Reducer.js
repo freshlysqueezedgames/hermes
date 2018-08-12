@@ -66,7 +66,7 @@ export default class Reducer {
     const action = new Action(name, payload, context)
 
     action.Reducer = () => {
-      return this 
+      return this
     }
 
     return action

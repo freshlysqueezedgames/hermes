@@ -334,3 +334,30 @@ store.Subscribe(Reducer.EVENTS.CHANGE, (event : Object) => {
 }, 'my/path')
 
 ```
+
+## To Be Resolved
+
+### Handling Path Matching Better
+
+Currently The Module handles paths a bit literally in matching the reducer to the expression. In literals this is fine but if you were to do something like:
+
+/a/(b|c)
+
+It would be lost
+
+/a/:index works fine, but this is because Hermes matches the ':' character
+
+A better approach is to cache off the regex urls and match them if we cannot rule out a path based on simpler criteria (number of steps, mismatching end key). This means that regex's should be cached off (this is fine as all paths are declared upfront for your reducers) and we should keep a log of matching paths so in future iterations they can be matched more precisely.
+
+### Reducer Stacking
+
+Say you have 3 paths :
+
+1 : /a/b,
+2 : /a/c,
+3 : /a/:index
+
+The problem here is both 1 & 3 is correct for /a/b, as is 1 & 2 for /a/c
+
+In this scenario, we should really induce BOTH reducers on the state object. preferably in the order they were declared. The resultant event would contain a mutated object with both applied.
+

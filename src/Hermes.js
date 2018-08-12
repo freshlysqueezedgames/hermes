@@ -300,7 +300,7 @@ export default class Hermes {
       while (j--) {
         const step: string = steps[j]
 
-        if (end.position === j + 1 && end.step !== step && end.step[0] !== ':') {
+        if (end.position === j + 1 && end.step !== step && end.step[0] !== ':') { // We need to match based on regex
           break
         }
 
@@ -462,6 +462,10 @@ export default class Hermes {
     return target
   }
 
+  OnNode (node: Object) {
+    return node
+  }
+
   Branch (target: Object, steps: Array, onNode?: callback, parenting: boolean = false): Object {
     const t : Hermes = this
 
@@ -469,9 +473,7 @@ export default class Hermes {
     let i: number = -1
     const l: number = steps.length
 
-    onNode = onNode || ((node: Object) => {
-      return node
-    })
+    onNode = onNode || t.OnNode
 
     while (++i < l) {
       const step: string = steps[i]

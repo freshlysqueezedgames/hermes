@@ -37,7 +37,7 @@ export default class Reducer {
    * will already have been affected.
    * @param {*} action 
    * @param {*} state 
-   * @param {*} payload 
+   * @param {*} payload
    */
   Reduce (action : Action, state : Object | Array = Object.create(null), payload : Array | Object = Object.create(null)) : Object | Array {
     const t : Reducer = this
@@ -78,7 +78,7 @@ export default class Reducer {
    * @param {String} eventName 
    * @param {Object} data 
    */
-  Dispatch (eventName : string, data : Object) {
-    this.hermes.AddEvent(eventName, data)
+  Dispatch (eventName : string) {
+    this.hermes.AddEvent(eventName)
   }
 }

@@ -119,11 +119,17 @@ export default class Hermes {
    * @name AddEvent
    * @description The number 
    * @param {*} name 
-   * @param {*} payload 
-   * @param {*} context 
+   * @param {*} payload
+   * @param {*} context
+   * @return {Hermes}
+   * @public
    */
-  AddEvent (name : string, payload : Object) {
-    this.events.push({name, payload, path : this.currentPath, context : this.context})
+  AddEvent (name : string) : Hermes {
+    const t : Hermes = this
+
+    t.events.push({name, payload : t.payload, path : t.currentPath, context : t.context})
+
+    return t
   }
 
   /**
@@ -131,9 +137,12 @@ export default class Hermes {
    * @description This marks the current path when a reducer event is fired, along with path params if the path is ambiguous
    * @param {string} name L 
    */
-  SetContext (path : string, context : Object) {
-    this.currentPath = path
-    this.context = context
+  SetContext (path : string, context : Object, payload : Function) {
+    const t : Hermes = this
+    
+    t.currentPath = path
+    t.context = context
+    t.payload = payload
   }
 
   Dispatch () {
@@ -163,7 +172,7 @@ export default class Hermes {
 
           for (let key in callback.projection) {
             const item : Array = callback.projection[key]
-            let target : any = event.payload
+            let target : any = event.payload()
             let i : number = 0
             const l : number = item.length
 
@@ -173,6 +182,9 @@ export default class Hermes {
           }
 
           content.payload = payload
+        } else {
+          console.log('me?', content, event)
+          content.payload = content.payload()
         }
 
         if (callback(content, event.context)) {
@@ -383,13 +395,13 @@ export default class Hermes {
       const {result} = t.Trace(path, t.reducerEnds, true) // look for an exact path match in the reducers
       const payload: Object = i === steps.length - 1 ? action.payload : undefined
 
-      t.SetContext(path.join('/'), action.context)
+      let state : Object | Array
 
-      if (!result || !result.reducer) {
-        return t.reducer.Reduce(action, node, payload)
-      }
+      t.SetContext(path.join('/'), action.context, function () {
+        return state
+      })
 
-      return result.reducer.Reduce(action, node, payload)
+      return (state = (!result || !result.reducer ? t.reducer : result.reducer).Reduce(action, node, payload))
     })
 
     // then the returned heap needs to be updated (tree structure, no longer branch path)
@@ -398,13 +410,13 @@ export default class Hermes {
       const path : Array = [...steps, ...keys]
       const {result} = t.Trace(path, t.reducerEnds, true) // look for an exact path match in the reducers
 
-      t.SetContext(path.join('/'), action.context)
+      let state : Object | Array
 
-      if (!result || !result.reducer) {
-        return t.reducer.Reduce(action, node, payload)
-      }
+      t.SetContext(path.join('/'), action.context, function () {
+        return state
+      })
 
-      return result.reducer.Reduce(action, node, payload)
+      return (state = (!result || !result.reducer ? t.reducer : result.reducer).Reduce(action, node, payload))
     }, t.reducerHeap)
 
     return t

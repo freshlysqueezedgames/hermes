@@ -91,6 +91,8 @@ Hermes acts as your container for a state heap (store), you can have as many or 
         // [...paths]
         // [...reducers]
       })
+
+      instance = t
     }
 
     static Instance (props? : Object) {

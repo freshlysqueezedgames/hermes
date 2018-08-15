@@ -495,31 +495,10 @@ export default class Hermes {
   }
 
   Print () {
-    console.log('this is the store', t.store)
+    console.log(this.store)
   }
 }
 
 function OnNode (node: Object) { // stops inline creation of objects in branch
   return node
 }
-
-
-    // const request : XMLHttpRequest = new XMLHttpRequest()
-
-    // request.open('GET', `${protocol}://${host}:${port}/${endPoint}`)
-    // request.setRequestHeader('Query', btoa(result.config.query))
-    // request.setRequestHeader('Params', btoa(JSON.stringify(action.payload)))
-  
-    // request.onload = () => {
-    //   const payload : Object = JSON.parse(request.response)
-  
-    //   if (payload.error) {
-    //     console.log('there was an error associated with this request')
-    //   }
-  
-    //   resolve && resolve({...action.payload, ...payload.data})
-    // }
-
-    // request.onerror = (error : Object) => reject && reject(error)
-  
-    // request.send()

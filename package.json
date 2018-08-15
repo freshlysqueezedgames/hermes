@@ -1,6 +1,6 @@
 {
   "name": "@freshlysqueezedgames/hermes",
-  "version": "0.2.2",
+  "version": "0.3.1",
   "description": "independant state management pipeline",
   "main": "dist/index.js",
   "scripts": {

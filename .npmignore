@@ -5,3 +5,8 @@
 **/.babelrc
 **/.eslintrc
 **/coverage
+
+# files
+
+**/*.test.js
+**/*.test.js.map

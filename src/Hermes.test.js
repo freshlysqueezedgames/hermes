@@ -46,47 +46,6 @@ describe('#Hermes', () => {
     }    
   }
 
-  test('Should be able to instantiate a heap definition from a path', () => {
-    const hermes : Hermes = new Hermes({
-      paths : {
-        'test/test/test' : true
-      }
-    })
-
-    expect(hermes).toHaveProperty('pathHeap')
-
-    let i : number = -1
-    const l : number = 2
-
-    let target = hermes.pathHeap
-
-    while (++i < l) {
-      target = target.test
-
-      expect(target).toHaveProperty('test')
-    }
-
-    target = target.test
-
-    expect(target).toMatchObject({
-      step : 'test',
-      position : 3
-    })
-  })
-
-  test('Should be able to instantiate a combined heap definition from multiple paths', () => {
-    const hermes : Hermes = new Hermes({
-      paths : {
-        'test/test/test' : true,
-        'test/test2/test' : true
-      }
-    })
-
-    expect(hermes).toHaveProperty('pathHeap')
-    expect(hermes.pathHeap.test).toHaveProperty('test')
-    expect(hermes.pathHeap.test).toHaveProperty('test2')
-  })
-
   test('Triggering an action on the store should generate the address with the payload data', (done : Function) => {
     const testReducer : TestReducer = new TestReducer
 
@@ -96,7 +55,7 @@ describe('#Hermes', () => {
       }
     })
 
-    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, (event : Object) => {
+    hermes.Subscribe(TestReducer.EVENTS.CHANGE, (event : Object) => {
       expect(event).toHaveProperty('name')
       expect(event.name).toStrictEqual(TestReducer.EVENTS.CHANGE)
 
@@ -134,7 +93,7 @@ describe('#Hermes', () => {
       }
     })
 
-    hermes.Subscribe(TestArrayReducer.ACTIONS.CHANGE, (event : Object) => {
+    hermes.Subscribe(TestArrayReducer.EVENTS.CHANGE, (event : Object) => {
       expect(event).toHaveProperty('name')
       expect(event.name).toStrictEqual(TestArrayReducer.EVENTS.CHANGE)
 
@@ -207,39 +166,8 @@ describe('#Hermes', () => {
 
     const incorrectMock : Jest.Mock = jest.fn()
 
-    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, correctMock, 'test')
-    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, incorrectMock, 'test/test')
-
-    hermes.Do(testReducer.Change(data))
-
-    expect(correctMock).toHaveBeenCalledTimes(1)
-    expect(incorrectMock).not.toHaveBeenCalled()
-  })
-
-  test('Multiple reducers should only fire events on the router at an exact path if a context is defined', (done : Function) => {
-    const testReducer : TestReducer = new TestReducer
-    const testReducer2 : TestReducer = new TestReducer
-
-    const hermes : Hermes = new Hermes({
-      reducers : {
-        'test' : testReducer,
-        'test/test' : testReducer2
-      }
-    })
-
-    const data : Object = {
-      test : 'test'
-    }
-
-    const correctMock : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
-      expect(event.payload).toMatchObject(data)
-      done()
-    })
-
-    const incorrectMock : Jest.Mock = jest.fn()
-
-    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, correctMock, 'test')
-    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, incorrectMock, 'test/test')
+    hermes.Subscribe(TestReducer.EVENTS.CHANGE, correctMock, 'test')
+    hermes.Subscribe(TestReducer.EVENTS.CHANGE, incorrectMock, 'test/test')
 
     hermes.Do(testReducer.Change(data), 'test')
 
@@ -250,12 +178,12 @@ describe('#Hermes', () => {
   // We should get a map indicating the path variable and its value.
   // @carl - the problem is that paths cannot be literally matched. Paths could be matched based on the regex of certain 
   // keys. SO we need to have a way of matching reducers with the path based on that. 
-  test('Generalised paths should return some parameters based on call path and reducer path', (done : Function) => {
+  test('Regex paths should be matched correctly', () => {
     const testReducer : TestReducer = new TestReducer
 
     const hermes : Hermes = new Hermes({
       reducers : {
-        'test/:place' : testReducer
+        '/a/b' : testReducer
       }
     })
 
@@ -264,14 +192,234 @@ describe('#Hermes', () => {
     }
 
     const mock : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
-      console.log('well thats cheesy', event)
       expect(event.payload).toMatchObject(data)
-      done()
+      expect(event.context).toMatchObject({
+        index : 'b'
+      })
     })
 
-    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, mock, 'test/test')
-    hermes.Do(testReducer.Change(data), 'test/test')
+    const mock2 : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
+      expect(event.payload).toMatchObject(data)
+      expect(event.context).toMatchObject({
+        '0' : 'b'
+      })
+    })
+
+    hermes.Subscribe(TestReducer.EVENTS.CHANGE, mock, '/a/:index')
+    hermes.Subscribe(TestReducer.EVENTS.CHANGE, mock2, '/a/(b|c)')
+
+    hermes.Do(testReducer.Change(data))
 
     expect(mock).toHaveBeenCalledTimes(1)
+    expect(mock2).toHaveBeenCalledTimes(1)
+  })
+
+  test('Regex paths for reducers should be matched correctly', () => {
+    class ContextReducer extends Reducer {
+      static ACTIONS : Object = {
+        CHANGE : 'testreducer.change'
+      }
+      
+      static EVENTS : Object = {
+        CHANGE : 'testreducer.change'
+      }
+  
+      Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
+        expect(action.name).toEqual(ContextReducer.ACTIONS.CHANGE)
+
+        this.Dispatch(ContextReducer.EVENTS.CHANGE)
+
+        return {...state, ...payload}
+      }
+  
+      Change (payload : Object, context : Object) {
+        return this.Action(ContextReducer.ACTIONS.CHANGE, payload, context)
+      }
+    }
+
+    const contextReducer : ContextReducer = new ContextReducer
+
+    const hermes : Hermes = new Hermes({
+      reducers : {
+       'a/:index' : contextReducer
+      }
+    })
+
+    const data : Object = {
+      test : 'test'
+    }
+  
+    const mock : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
+      expect(event.payload).toMatchObject(data)
+      expect(event.context).toMatchObject({index : 'b'})
+    })
+
+    hermes.Subscribe(TestReducer.EVENTS.CHANGE, mock, 'a/b')
+    hermes.Do(contextReducer.Change(data, {index : 'b'}))
+
+    expect(mock).toHaveBeenCalledTimes(1)
+  })
+
+  test('Subscribers and Reducers can both match by ambiguous paths', () => {
+    class ContextReducer extends Reducer {
+      static ACTIONS : Object = {
+        CHANGE : 'testreducer.change'
+      }
+      
+      static EVENTS : Object = {
+        CHANGE : 'testreducer.change'
+      }
+  
+      Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
+        expect(action.name).toEqual(ContextReducer.ACTIONS.CHANGE)
+
+        this.Dispatch(ContextReducer.EVENTS.CHANGE)
+
+        return {...state, ...payload}
+      }
+  
+      Change (payload : Object, context : Object) {
+        return this.Action(ContextReducer.ACTIONS.CHANGE, payload, context)
+      }
+    }
+
+    const contextReducer : ContextReducer = new ContextReducer
+
+    const hermes : Hermes = new Hermes({
+      reducers : {
+       'a/:index' : contextReducer
+      }
+    })
+
+    const data : Object = {
+      test : 'test'
+    }
+  
+    const mock : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
+      expect(event.payload).toMatchObject(data)
+      expect(event.context).toMatchObject({index : 'b'})
+    })
+
+    hermes.Subscribe(TestReducer.EVENTS.CHANGE, mock, 'a/:foo')
+    hermes.Do(contextReducer.Change(data, {index : 'b'}))
+
+    expect(mock).toHaveBeenCalledTimes(1)
+  })
+
+  test('Subscribers and Reducers can both match by ambiguous paths', () => {
+    console.log('next!')
+
+    class ContextReducer extends Reducer {
+      static ACTIONS : Object = {
+        CHANGE : 'contextreducer.change'
+      }
+      
+      static EVENTS : Object = {
+        CHANGE : 'contextreducer.change'
+      }
+  
+      Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
+        expect(action.name).toEqual(ContextReducer.ACTIONS.CHANGE)
+
+        this.Dispatch(ContextReducer.EVENTS.CHANGE)
+
+        return {...state, ...payload}
+      }
+  
+      Change (payload : Object, context : Object) {
+        return this.Action(ContextReducer.ACTIONS.CHANGE, payload, context)
+      }
+    }
+
+    class ContextReducer2 extends Reducer {
+      static ACTIONS : Object = {
+        CHANGE : 'contextreducer2.change'
+      }
+      
+      static EVENTS : Object = {
+        CHANGE : 'contextreducer2.change'
+      }
+  
+      Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
+        expect(action.name).toEqual(ContextReducer.ACTIONS.CHANGE) // we expect the original action.
+        expect(state).toMatchObject({
+          test : 'test' // this means that the first reducer has applied it's state
+        })
+
+        this.Dispatch(ContextReducer2.EVENTS.CHANGE)
+
+        return {...state, test2 : 'test2'}
+      }
+  
+      Change (payload : Object, context : Object) {
+        return this.Action(ContextReducer2.ACTIONS.CHANGE, payload, context)
+      }
+    }
+
+    const contextReducer : ContextReducer = new ContextReducer
+    const contextReducer2 : ContextReducer2 = new ContextReducer2
+    
+    const hermes : Hermes = new Hermes({
+      reducers : {
+       'a/:index' : contextReducer,
+       'a/b' : contextReducer2
+      }
+    })
+
+    const data : Object = {
+      test : 'test'
+    }
+  
+    const mock : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
+      expect(event.payload).toMatchObject({
+        test : 'test',
+        test2 : 'test2'
+      })
+      expect(event.context).toMatchObject({index : 'b'})
+    })
+
+    hermes.Subscribe(ContextReducer.EVENTS.CHANGE, mock, 'a/b')
+    hermes.Do(contextReducer.Change(data, {index : 'b'}))
+
+    expect(mock).toHaveBeenCalledTimes(1)
+  })
+
+  test('Should be able to accept a plugin object with paths and a request function', (done : Function) => {
+    console.log('the world of the bean')
+
+    const testReducer : TestReducer = new TestReducer
+
+    const hermes : Hermes = new Hermes({
+      reducers : {
+        'test/test' : testReducer
+      },
+      remote : {
+        paths : [
+          'test/test'
+        ],
+        request : (path : string, action : Action, resolve : Function) : boolean => {
+          expect(path).toEqual('test/test')
+
+          resolve({more : 'data'})
+
+          done()
+        }
+      }
+    })
+
+    const mock : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
+      expect(event.path).toEqual('test/test')
+
+      expect(event.payload).toMatchObject({
+        test : 'test',
+        more : 'data'
+      })
+    })
+
+    hermes.Subscribe(TestReducer.EVENTS.CHANGE, mock)
+
+    hermes.Do(testReducer.Change({
+      test : 'test'
+    }))
   })
 })

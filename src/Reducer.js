@@ -1,8 +1,7 @@
 import Action from './Action'
 
 const {toString} = Object.prototype
-
-let id : number = 0
+const ARRAY = '[object Array]' 
 
 export default class Reducer {
   static EVENTS : Object = {
@@ -14,18 +13,6 @@ export default class Reducer {
 
     t.path = ""
     t.hermes = null
-
-    t.id = id++
-  }
-
-  /**
-   * @name Submission
-   * @description Callback for when an Action is submitted that affects the reducer. This can be used to dispatch events
-   * triggering state updates within the UI (say you wish to notify the user of an impending update to information and want to display something to indicate such)
-   * @param {Action} action The action submitted into the system. 
-   */
-  Submission (action : Action) : Reducer {
-    return this
   }
 
   /**
@@ -40,19 +27,7 @@ export default class Reducer {
    * @param {*} payload
    */
   Reduce (action : Action, state : Object | Array = Object.create(null), payload : Array | Object = Object.create(null)) : Object | Array {
-    const t : Reducer = this
-
-    console.log('hello!');
-    
-    if (toString.call(state) === '[object Array]') {
-      if (state.length === payload.length) {
-        [...state]
-      }
-
-      return [...payload]
-    }
-
-    return {...state, ...payload}
+    return toString.call(state) === ARRAY ? [...payload] : {...state, ...payload}
   }
 
   /**

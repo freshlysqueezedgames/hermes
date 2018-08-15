@@ -6,24 +6,14 @@ import pathToRegexp from 'path-to-regexp'
  * and how the request should behave in general.
  */
 export default class Route {
-  constructor (path : string, props? : Object | boolean) {
+  constructor (path : string) {
     const t : Route = this
+
+    t.originalPath = path
     
-    if (typeof props !== 'object') {
-      props = Object.create(null)
-    }
+    path = `${path}(\/?.*)` // Generalise to always match the beginning, and allow for any number of characters after
 
     t.ToPath = pathToRegexp.compile(path)
     t.re = pathToRegexp(path)
-
-    if (props === true) {
-      return
-    }
-
-    t.query = props.query
-
-    if (props.literalPath) {
-      t.literalPath = props.literalPath
-    }
   }
 }

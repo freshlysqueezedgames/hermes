@@ -3,7 +3,6 @@ import pathToRegexp from 'path-to-regexp'
 import Action from './Action'
 import Reducer from './Reducer'
 import Route from './Route'
-import {OrderByLongest} from './Utils'
 
 const {toString, hasOwnProperty} = Object.prototype
 
@@ -42,46 +41,53 @@ export default class Hermes {
     // Each hermes instance has a private store that is used to manage a state heap.
     t.store = Object.create(null)
 
-    t.pathHeap = Object.create(null) // t.stores path information in a searchable heap
-    t.pathEnds = [] // We can more efficiently tracet.pathHeap by working backwards from the leaves to the root
-
     t.reducerHeap = Object.create(null)
     t.reducerEnds = []
 
     // Apply props to the instance
     t.verbose = props.verbose || false
-    t.paths = props.paths || false
 
-    t.host = props.host
-    t.protocol = props.protocol
-    t.port = props.port
-    t.endPoint = props.endPoint
-    
-    // Now we need to apply our paths to create our initial heap
-    if (props.paths) {
-      props.paths = OrderByLongest(props.paths)
+    if (props.remote) {
+      let {paths, request} = props.remote
 
-      for (let key in props.paths) {
-        let config: any = new Route(key, props.paths[key])
-
-        const current: Object = t.Branch(t.pathHeap, key.split('/'), (node : Object, step : string, i : number) : Object => {
-          node.step = step
-          node.position = i + 1
-
-          return node
-        }, true)
-
-        t.pathEnds.push(current)
-        current.config = config
+      if (!paths) {
+        throw new Error('Paths must be specified on the remote where you expect a server connection to occur')
       }
+
+      if (!request) {
+        throw new Error('A request function must be defined so that hermes can give appropriate data back to you')
+      }
+
+      paths = [...paths]
+      
+      paths.sort((a : string, b : string) : number => {
+        if (a.length > b.length) {
+          return -1
+        }
+    
+        if (b.length > a.length) {
+          return 1
+        }
+    
+        return 0
+      })
+
+      let i : number = -1
+      const l : number = paths.length
+
+      while (++i < l) {
+        paths[i] = new Route(paths[i])
+      }
+
+      t.remote = {request, paths}
     }
 
-    if (props.reducers) {
-      props.reducers = OrderByLongest(props.reducers)
+    const {reducers} = props
 
-      for (let key in props.reducers) {
-        if (hasOwnProperty.call(props.reducers, key)) {
-          const targetReducer: Reducer = props.reducers[key]
+    if (reducers) {
+      for (let key in reducers) {
+        if (hasOwnProperty.call(reducers, key)) {
+          const targetReducer: Reducer = reducers[key]
 
           if (!(targetReducer instanceof Reducer)) {
             throw new Error('Property at path: ', key, ' is not a Reducer instance!')
@@ -104,7 +110,9 @@ export default class Hermes {
           t.reducerEnds.push(current)
 
           current.reducer = targetReducer
+
           targetReducer.path = key
+          targetReducer.regex = pathToRegexp(key)
         }
       }
     } else if (props.verbose) {
@@ -119,11 +127,17 @@ export default class Hermes {
    * @name AddEvent
    * @description The number 
    * @param {*} name 
-   * @param {*} payload 
-   * @param {*} context 
+   * @param {*} payload
+   * @param {*} context
+   * @return {Hermes}
+   * @public
    */
-  AddEvent (name : string, payload : Object) {
-    this.events.push({name, payload, path : this.currentPath, context : this.context})
+  AddEvent (name : string) : Hermes {
+    const t : Hermes = this
+
+    t.events.push({name, payload : t.payload, path : t.currentPath, context : t.context})
+
+    return t
   }
 
   /**
@@ -131,9 +145,12 @@ export default class Hermes {
    * @description This marks the current path when a reducer event is fired, along with path params if the path is ambiguous
    * @param {string} name L 
    */
-  SetContext (path : string, context : Object) {
-    this.currentPath = path
-    this.context = context
+  SetContext (path : string, context : Object, payload : Function) {
+    const t : Hermes = this
+    
+    t.currentPath = path
+    t.context = context
+    t.payload = payload
   }
 
   Dispatch () {
@@ -152,7 +169,9 @@ export default class Hermes {
       let callback
 
       while ((callback = list[++j])) {
-        if (callback.path && callback.path !== event.path) {
+        let result : Array
+
+        if (callback.regex && !(result = callback.regex.exec(event.path))) {
           continue
         }
 
@@ -163,7 +182,7 @@ export default class Hermes {
 
           for (let key in callback.projection) {
             const item : Array = callback.projection[key]
-            let target : any = event.payload
+            let target : any = event.payload()
             let i : number = 0
             const l : number = item.length
 
@@ -173,26 +192,48 @@ export default class Hermes {
           }
 
           content.payload = payload
+        } else {
+          content.payload = content.payload() // invoke this to collect the resultant state, and remove the reference for GC
         }
 
-        if (callback(content, event.context)) {
+        const keys : Array = callback.keys
+
+        if (keys && keys.length) { // if the urls have keys, we need to gather the values so we can show the context
+          const context : Object = Object.create(null)
+
+          result.shift()
+
+          let i : number = keys.length
+
+          while (i--) {
+            context[keys[i].name] = result[i]
+          }
+
+          content.context = context
+        }
+
+        if (callback(content)) {
           list.splice(j--, 1)
         }
       }
     }
 
     t.events = []
+    t.currentPath = ''
+    
+    t.payload = null
+    t.context = null
   }
   
   /**
    * @name Subscribe
    * @description Applies a listener to 
    * @param {*} name 
-   * @param {*} callback 
+   * @param {*} callback
    * @param {*} context 
    * @param {*} projection 
    */
-  Subscribe (name: string, callback: Function, path : string, projection: Object): Hermes {
+  Subscribe (name: string, callback: Function, path? : string, projection?: Object): Hermes {
     const t: Hermes = this
 
     if (!name || typeof name !== 'string' || toString.call(callback) !== FUNCTION) {
@@ -205,7 +246,11 @@ export default class Hermes {
 
     const list : Array = t.callbacks[name] = t.callbacks[name] || [] // create a new array if there isn't one
 
-    callback.path = path
+    if (path) {
+      callback.keys = []
+      callback.regex = pathToRegexp(path, callback.keys)
+    }
+
     callback.projection = projection
 
     list.push(callback)
@@ -239,9 +284,6 @@ export default class Hermes {
 
         if (targetReducer === reducerEnd) {
           path = reducerEnd.path
-
-          // notify reducer of submission
-          reducerEnd.Submission(action)
           break
         }
       }
@@ -251,69 +293,23 @@ export default class Hermes {
     return t.Query(pathToRegexp.compile(path)(action.context), action)
   }
 
-  /**
-   * @name Trace
-   * @description Using a list of leaves from the heap, this function will find the matching branch to a list of steps
-   * #TODO: Should store results so that if invoked multiple times we have a record of the correct path for performance
-   * @param {Array} steps : The path represented as an array of keys
-   * @param {Array[Optional]} ends : A list of leaves from a Hermes heap.
-   * @return {Object} the resultant request path if any, and the leaf
-   * @public
-   */
-  Trace (steps: Array, ends?: Array) {
-    const t: Hermes = this
-
-    ends = ends || t.pathEnds
-
-    let i: number = -1
-    const l: number = ends.length
-
-    let requestPath: Array
-    let closestPath: Array
-
-    let result: Object
+  MatchingReducers (path : string) : Array {
+    const t : Hermes = this
+    const {reducerEnds} = t
+    let reducers : Array
+    
+    let i : number = -1
+    const l : number = reducerEnds.length
 
     while (++i < l) {
-      let end: Object = ends[i]
+      const reducer : Reducer = reducerEnds[i].reducer
 
-      if (end.position !== steps.length) { // the path must be the same length
-        continue
-      }
-
-      let j: number = steps.length
-
-      while (j--) {
-        const step: string = steps[j]
-
-        if (end.position === j + 1 && end.step !== step && end.step[0] !== ':') {
-          break
-        }
-
-        if (end.position === j + 1) {
-          end = end.parent
-        }
-      }
-
-      if (j === -1) {
-        end = ends[i]
-
-        result = end
-        closestPath = [end.step]
-
-        while ((end = end.parent) && end.step) {
-          closestPath.unshift(end.step)
-        }
-
-        requestPath = steps.slice(0, closestPath.length)
-
-        break
+      if (reducer.regex.exec(path) !== null) {
+        (reducers = reducers || []).push(reducer)
       }
     }
 
-    return {
-      requestPath,
-      result
-    }
+    return reducers
   }
 
   /**
@@ -331,18 +327,40 @@ export default class Hermes {
       console.log('getting this path!', path)
     }
 
-    const steps: Array = path.split('/')
-    const {requestPath, result} = t.Trace(steps)
-
     const OnApply: Function = (payload: Object = Object.create(null)) => {
       action.payload = payload // Override the payload with the new one given
 
       // Update the store, and ensure that the new state is in place.
-      t.Update(steps, action)
+      t.Update(path.split('/'), action)
 
       // This part, working in parent-first left-to-right, we should trigger any subscribers at each path within the CHANGED heap.
       //Publish.call(t, steps, action)
       t.Dispatch()
+    }
+
+    if (!t.remote || !t.remote.paths || !t.remote.paths.length) {
+      OnApply(action.payload)
+      return
+    }
+    
+    const {paths} : Array = t.remote
+
+    let i : number = -1
+    const l : number = paths.length
+
+    let requestPath : string
+
+    while (++i < l) {
+      const item : string = paths[i]
+
+      if (item.re.test(path)) {
+        if (action.context && Object.keys(action.context).length) {
+          requestPath = item.ToPath(action.context)
+        } else {
+          requestPath = item.originalPath
+        }
+        break
+      }
     }
 
     if (!requestPath) {
@@ -351,16 +369,17 @@ export default class Hermes {
       return
     }
 
-    steps.splice(requestPath.length)
+    try { // we want to launch a new promise, which 
+      const result : Object = await new Promise ((resolve : Function, reject : Function) => {
+        if(t.remote.request(requestPath, action, (payload : Object) => resolve && resolve({...action.payload, ...payload})) === false) {
+          resolve(action.payload)
+        }
+      })
 
-    if (t.verbose) {
-      console.log('requesting this path!', requestPath.join('/'))
-    }
-
-    try {
-      OnApply(await Request.call(t))
+      OnApply(result)
     } catch (error) {
-      console.warn('Request failed in the network')
+      console.warn('Request failed in the network', error)
+      OnApply({error : 'Request Failed'})
     }
   }
 
@@ -375,36 +394,36 @@ export default class Hermes {
   Update (steps: Array, action: Action) : Hermes {
     const t: Hermes = this
 
+    function OnStep (node : Object, path : Array, payload : Object) {
+      const strPath : string = path.join('/')
+      const result = t.MatchingReducers(strPath) || [t.reducer] // look for an exact path match in the reducers
+
+      let state : Object | Array = node
+
+      t.SetContext(strPath, action.context, function () {
+        return state
+      })
+
+      let i : number = -1
+      const l : number = result.length
+
+      while (++i < l) {
+        state = result[i].Reduce(action, state, payload)
+      }
+
+      return state
+    }
+
     // we need to update the branch for the store where the path is concerned
     // no payload as this is just a path update
     const store: Object = t.Branch(t.store, steps, (node : Object, step : string, i : number) : Object => {
-      const path : Array = steps.slice(0, i + 1)
-
-      const {result} = t.Trace(path, t.reducerEnds, true) // look for an exact path match in the reducers
-      const payload: Object = i === steps.length - 1 ? action.payload : undefined
-
-      t.SetContext(path.join('/'), action.context)
-
-      if (!result || !result.reducer) {
-        return t.reducer.Reduce(action, node, payload)
-      }
-
-      return result.reducer.Reduce(action, node, payload)
+      return OnStep(node, steps.slice(0, i + 1), i === steps.length - 1 ? action.payload : undefined)
     })
 
     // then the returned heap needs to be updated (tree structure, no longer branch path)
     // payloads exist because we are now in the returned object heap. 
     t.Tree(store, action.payload, (node : Object, payload : Object, keys : Array) : Object => {
-      const path : Array = [...steps, ...keys]
-      const {result} = t.Trace(path, t.reducerEnds, true) // look for an exact path match in the reducers
-
-      t.SetContext(path.join('/'), action.context)
-
-      if (!result || !result.reducer) {
-        return t.reducer.Reduce(action, node, payload)
-      }
-
-      return result.reducer.Reduce(action, node, payload)
+      return OnStep(node, [...steps, ...keys], payload)
     }, t.reducerHeap)
 
     return t
@@ -454,9 +473,7 @@ export default class Hermes {
     let i: number = -1
     const l: number = steps.length
 
-    onNode = onNode || ((node: Object) => {
-      return node
-    })
+    onNode = onNode || OnNode
 
     while (++i < l) {
       const step: string = steps[i]
@@ -478,33 +495,10 @@ export default class Hermes {
   }
 
   Print () {
-    console.log('this is the store', t.store)
+    console.log(this.store)
   }
 }
 
-function Request () : Promise {
-  // We need to be able to deviate here based on the type of request. Either it will follow a REST style system or GraphQL style system
-  const {protocol, host, port, endPoint} = t
-
-  return new Promise ((resolve : Function, reject : Function) => {
-    const request : XMLHttpRequest = new XMLHttpRequest()
-
-    request.open('GET', `${protocol}://${host}:${port}/${endPoint}`)
-    request.setRequestHeader('Query', btoa(result.config.query))
-    request.setRequestHeader('Params', btoa(JSON.stringify(action.payload)))
-  
-    request.onload = () => {
-      const payload : Object = JSON.parse(request.response)
-  
-      if (payload.error) {
-        console.log('there was an error associated with this request')
-      }
-  
-      resolve && resolve({...action.payload, ...payload.data})
-    }
-
-    request.onerror = (error : Object) => reject && reject(error)
-  
-    request.send()
-  })
+function OnNode (node: Object) { // stops inline creation of objects in branch
+  return node
 }

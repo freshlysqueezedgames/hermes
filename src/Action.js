@@ -1,6 +1,6 @@
 const {toString} = Object.prototype
 
-class Action {
+export default class Action {
   static DEFAULT : string = 'action.default'
 
   constructor (name : string, payload : Object = Object.create(null), context : Object = Object.create(null)) {
@@ -11,17 +11,7 @@ class Action {
     }
 
     t.name = name 
-
-    if (payload) {
-      t.payload = payload
-    }
-
+    t.payload = payload
     t.context = context
   }
-
-  Is (name : string) : boolean {
-    return name === this.name
-  }
 }
-
-export default Action

@@ -17,21 +17,12 @@ const OBJECT : string = '[object Object]'
  * trigger changes in the t.store (including from the server) and views can subscribe to object changes in the heap(s)
 */
 export default class Hermes {
-  static DEFAULTS : Object = {
-    protocol : 'http',
-    host : '127.0.0.1',
-    port : '80',
-    endPoint : 'arc'
-  }
-
   /**
    * @constructor
    * @description Takes the property configuration and build the store, path and reducer heaps. Keeping appropriate linear leaf references for fast lookup times
    * @param {Object} props 
    */
   constructor (props: Object) {
-    props = {...Hermes.DEFAULTS, ...props}
-
     const t : Hermes = this
 
     t.events = []
@@ -121,6 +112,8 @@ export default class Hermes {
 
     t.reducer = new Reducer()
     t.reducer.hermes = t
+  
+    t.map = {} // this will be used to index matching reducers based on paths
   }  
 
   /**
@@ -266,31 +259,14 @@ export default class Hermes {
    * @return {Promise} A promise that resolves when the action has been executed
    * @public
    */
-  Do (action: Action, path? : string): Promise {
+  Do (action: Action): Promise {
     const t: Hermes = this
 
     if (!(action instanceof Action)) {
       throw new Error('Parameter 1 must be an Action instance', action)
     }
-
-    if (typeof path !== 'string') {
-      // We look at the instance, and determine our path based on the reducer instance associated with the action
-      let i: number = t.reducerEnds.length
-      const targetReducer: Reducer = action.Reducer()
-
-      // Match the reducer
-      while (i--) {
-        const reducerEnd: Reducer = t.reducerEnds[i].reducer
-
-        if (targetReducer === reducerEnd) {
-          path = reducerEnd.path
-          break
-        }
-      }
-    }
-
     // one time call for the first request of the data
-    return t.Query(pathToRegexp.compile(path)(action.context), action)
+    return t.Query(pathToRegexp.compile(action.Reducer().path)(action.context), action)
   }
 
   MatchingReducers (path : string) : Array {
@@ -298,6 +274,10 @@ export default class Hermes {
     const {reducerEnds} = t
     let reducers : Array
     
+    if (t.map[path]) { // cuts out having to do regex's more than once on a path.
+      return t.map[path]
+    }
+
     let i : number = -1
     const l : number = reducerEnds.length
 
@@ -309,7 +289,7 @@ export default class Hermes {
       }
     }
 
-    return reducers
+    return (t.map[path] = reducers)
   }
 
   /**

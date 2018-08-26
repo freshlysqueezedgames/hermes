@@ -307,11 +307,12 @@ export default class Hermes {
       console.log('getting this path!', path)
     }
 
+    const steps : Array = path.split('/')
     const OnApply: Function = (payload: Object = Object.create(null)) => {
       action.payload = payload // Override the payload with the new one given
 
       // Update the store, and ensure that the new state is in place.
-      t.Update(path.split('/'), action)
+      t.Update(steps, action)
 
       // This part, working in parent-first left-to-right, we should trigger any subscribers at each path within the CHANGED heap.
       //Publish.call(t, steps, action)
@@ -350,8 +351,14 @@ export default class Hermes {
     }
 
     try { // we want to launch a new promise, which 
+      let state : Object
+      
+      t.Branch(t.store, steps, (node : Object) => {
+        return (state = node)
+      })
+
       const result : Object = await new Promise ((resolve : Function, reject : Function) => {
-        if(t.remote.request(requestPath, action, (payload : Object) => resolve && resolve({...action.payload, ...payload})) === false) {
+        if(t.remote.request(requestPath, action, state, (payload : Object) => resolve && resolve({...action.payload, ...payload})) === false) {
           resolve(action.payload)
         }
       })

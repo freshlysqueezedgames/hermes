@@ -397,8 +397,9 @@ describe('#Hermes', () => {
         paths : [
           'test/test'
         ],
-        request : (path : string, action : Action, resolve : Function) : boolean => {
+        request : (path : string, action : Action, state : Object, resolve : Function) : boolean => {
           expect(path).toEqual('test/test')
+          expect(state).toMatchObject({})
 
           resolve({more : 'data'})
 

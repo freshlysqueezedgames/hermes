@@ -21,6 +21,17 @@ describe('#Reducer', () => {
     expect(state).toMatchObject(payload)
   })
 
+  test('Should be able to override who array as default', () => {
+    const reducer : Reducer = new Reducer()
+
+    expect(reducer).toBeInstanceOf(Reducer)
+
+    const payload : Object = ['one', 'two']
+    const state = reducer.Reduce(reducer.Action('test.action'), payload, payload)
+
+    expect(state).toMatchObject(payload)
+  })
+
   test('Should override original state with payload', () => {
     const reducer : Reducer = new Reducer()
     

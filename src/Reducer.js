@@ -26,7 +26,11 @@ export default class Reducer {
    * @param {*} state 
    * @param {*} payload
    */
-  Reduce (action : Action, state : Object | Array = Object.create(null), payload : Array | Object = Object.create(null)) : Object | Array {
+  Reduce (action : Action, state : Object | Array = Object.create(null), payload? : Array | Object) : Object | Array {
+    if (!payload) {
+      return state
+    }
+
     return toString.call(state) === ARRAY ? [...payload] : {...state, ...payload}
   }
 

@@ -38,6 +38,8 @@ export default class Hermes {
     // Apply props to the instance
     t.verbose = props.verbose || false
 
+    t.ignoreEvents = false
+
     if (props.remote) {
       let {paths, request} = props.remote
 
@@ -91,7 +93,7 @@ export default class Hermes {
           // Bind a function for accessing the events list. There is one list per Hermes.
           targetReducer.hermes = t
 
-          const current: Object = t.Branch(t.reducerHeap, key.split('/'), (node : Object, step : string, i : number) => {
+          const current: Object = t.Branch(t.reducerHeap, key.split('/'), (node : Object = Object.create(null), step : string, i : number) => {
             node.step = step
             node.position = i + 1
 
@@ -127,6 +129,10 @@ export default class Hermes {
    */
   AddEvent (name : string) : Hermes {
     const t : Hermes = this
+
+    if (t.ignoreEvents) {
+      return t
+    }
 
     t.events.push({name, payload : t.payload, path : t.currentPath, context : t.context})
 
@@ -259,14 +265,14 @@ export default class Hermes {
    * @return {Promise} A promise that resolves when the action has been executed
    * @public
    */
-  Do (action: Action): Promise {
+  Do (action: Action, path? : string): Promise {
     const t: Hermes = this
 
     if (!(action instanceof Action)) {
       throw new Error('Parameter 1 must be an Action instance', action)
     }
     // one time call for the first request of the data
-    return t.Query(pathToRegexp.compile(action.Reducer().path)(action.context), action)
+    return t.Query(pathToRegexp.compile(path || action.Reducer().path)(action.context), action)
   }
 
   MatchingReducers (path : string) : Array {
@@ -354,7 +360,7 @@ export default class Hermes {
       let state : Object
       
       t.Branch(t.store, steps, (node : Object) => {
-        return (state = node)
+        return (state = node || Object.create(null))
       })
 
       const result : Object = await new Promise ((resolve : Function, reject : Function) => {
@@ -385,7 +391,14 @@ export default class Hermes {
       const strPath : string = path.join('/')
       const result = t.MatchingReducers(strPath) || [t.reducer] // look for an exact path match in the reducers
 
-      let state : Object | Array = node
+      let state : Object | Array = node 
+      
+      if (!state) {
+        t.ignoreEvents = true
+        state = result[0].Reduce(new Action('__init__'))
+        // remove events created as a result.
+        t.ignoreEvents = false
+      }
 
       t.SetContext(strPath, action.context, function () {
         return state
@@ -469,7 +482,9 @@ export default class Hermes {
         continue
       }
 
-      target[step] = onNode(target[step] || Object.create(null), step, i)
+      console.log('bah!', target[step])
+
+      target[step] = onNode(target[step], step, i)
 
       if (parenting) {
         target[step].parent = target

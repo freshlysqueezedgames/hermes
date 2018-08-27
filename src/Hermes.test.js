@@ -12,15 +12,13 @@ describe('#Hermes', () => {
     }
 
     Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
-      const newState : Object = {...state, ...payload}
-    
-      this.Dispatch(TestReducer.EVENTS.CHANGE, newState)
+      this.Dispatch(TestReducer.EVENTS.CHANGE)
 
-      return newState
+      return {...state, ...payload}
     }
 
-    Change (payload : Object) {
-      return this.Action(TestReducer.ACTIONS.CHANGE, payload)
+    Change (payload : Object, context? : Object) {
+      return this.Action(TestReducer.ACTIONS.CHANGE, payload, context)
     }
   }
 
@@ -33,16 +31,18 @@ describe('#Hermes', () => {
       CHANGE : 'testreducer.change'
     }
 
-    Reduce (action : Hermes.Action, state : Array = [], payload : Object) {
-      const newState : Object = [...state, ...payload]
-    
-      this.Dispatch(TestReducer.EVENTS.CHANGE, newState)
+    Reduce (action : Hermes.Action, state : Array = [], payload : Object) {    
+      this.Dispatch(TestReducer.EVENTS.CHANGE)
 
-      return newState
+      if (!payload) {
+        return state
+      }
+
+      return [...state, ...payload]
     }
 
-    Change (payload : Object) {
-      return this.Action(TestReducer.ACTIONS.CHANGE, payload)
+    Change (payload : Object, context? : Object) {
+      return this.Action(TestReducer.ACTIONS.CHANGE, payload, context)
     }    
   }
 
@@ -225,6 +225,10 @@ describe('#Hermes', () => {
       }
   
       Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
+        if (action.name === '__init__') {
+          return state
+        }
+
         expect(action.name).toEqual(ContextReducer.ACTIONS.CHANGE)
 
         this.Dispatch(ContextReducer.EVENTS.CHANGE)
@@ -271,6 +275,10 @@ describe('#Hermes', () => {
       }
   
       Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
+        if (action.name === '__init__') {
+          return
+        }  
+
         expect(action.name).toEqual(ContextReducer.ACTIONS.CHANGE)
 
         this.Dispatch(ContextReducer.EVENTS.CHANGE)
@@ -319,6 +327,10 @@ describe('#Hermes', () => {
       }
   
       Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
+        if (action.name === '__init__') {
+          return state
+        }
+  
         expect(action.name).toEqual(ContextReducer.ACTIONS.CHANGE)
 
         this.Dispatch(ContextReducer.EVENTS.CHANGE)
@@ -341,6 +353,10 @@ describe('#Hermes', () => {
       }
   
       Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
+        if (action.name === '__init__') {
+          return state
+        }
+
         expect(action.name).toEqual(ContextReducer.ACTIONS.CHANGE) // we expect the original action.
         expect(state).toMatchObject({
           test : 'test' // this means that the first reducer has applied it's state
@@ -422,5 +438,76 @@ describe('#Hermes', () => {
     hermes.Do(testReducer.Change({
       test : 'test'
     }))
+  })
+
+  test('Should preserve original values from the state', (done : Function) => {
+    const testReducer : TestReducer = new TestReducer
+    const childReducer : TestReducer = new TestReducer
+
+    const store = new Hermes({
+      reducers : {
+        'parent' : testReducer,
+        'parent/child' : childReducer
+      }
+    })
+
+    store.Do(childReducer.Change({test : 'test'}))
+
+    const mock : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
+      expect(event.payload).toMatchObject({
+        test : 'test',
+        test2 : 'test2'
+      })
+
+      done()
+
+      return true
+    })
+
+    store.Subscribe(TestReducer.EVENTS.CHANGE, mock, 'parent/child')
+
+    store.Do(childReducer.Change({test2 : 'test2'}))
+  })
+
+  test('Should preserve original values from the state for arrays', (done : Function) => {
+    console.log('beans of nazareth')
+
+    const testArrayReducer : TestArrayReducer = new TestArrayReducer
+    const childReducer : TestReducer = new TestReducer
+
+    const store = new Hermes({
+      reducers : {
+        'parent' : testArrayReducer,
+        'parent/:index' : childReducer
+      }
+    })
+
+    store.Do(childReducer.Change({test : 'test'}, {index : 0}))
+
+    console.log('now we update')
+
+    const mock : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
+      expect(event.payload).toMatchObject({
+        test : 'test',
+        test2 : 'test2'
+      })
+
+      console.log('beans alive!', event.payload)
+
+      done()
+
+      return true
+    })
+
+    const mock2 : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
+      expect(event.payload).toMatchObject([
+        {test : 'test', test2 : 'test2'}
+      ])
+    })
+
+    store.Subscribe(TestReducer.EVENTS.CHANGE, mock, 'parent/0')
+    store.Subscribe(TestArrayReducer.EVENTS.CHANGE, mock2)
+
+    store.Do(childReducer.Change({test2 : 'test2'}, {index : 0}))
   })
 })

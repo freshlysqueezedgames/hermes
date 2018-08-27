@@ -6,9 +6,7 @@ Hermes is an alternative to other flux implementations that uses paths as addres
 It should also be encapsulated enough that using with any DOM Rendering Framework should be intuitive and easy.
 
 It has one dependency : the [path-to-regexp](https://github.com/pillarjs/path-to-regexp) module, which has a handy syntax for writing generalised path syntax, 
-you can play around with [testing different paths here](https://forbeslindesay.github.io/express-route-tester/)
-
-Hermes is currently built to handle GraphQL communication, but I will be abstracting this in future work.
+you can play around with [testing different paths here](https://forbeslindesay.github.io/express-route-tester/).
 
 ** Currently In Development, Not Fully Featured as of Yet **
 
@@ -65,10 +63,35 @@ store.Do(myReducer.Change({some : 'data'}))
 
 ```
 
+To integrate network communication, you can use a remote configuration, like so:
+
+```javascript
+
+const store : Hermes = new Hermes({
+  reducers : {
+    'my/path' : myReducer
+  },
+  remote : {
+    paths : [
+      'my/path' // list paths that a request to a remote server is used for
+    ],
+    request : (path : string, action : Hermes.Action, state : Object, resolve : Function) => {
+      return false // returning false indicates no request is needed
+    }
+  }
+})
+
+```
 
 ## Hermes Class
 
 Hermes acts as your container for a state heap (store), you can have as many or as few as you want, the only caveat is whereever you decide to manage your store should be a wrapper in a way so as to be exposed singularly to the rendering framework heap. You can achieve this as follows, but you may have your own pattern you like to follow:
+
+| Function | Signature | Returns | Description |
+| -------- | --------- | ------- | ----------- |
+| Subscribe | name: string, callback: Function, path? : string, projection?: Object | Hermes | This function subscribes to events on a particular reducer. |
+| Do        | action: Action, path? : string | Promise | Launches an action on the state heap, resolves when complete |
+| -------- | --------- | ------- | ----------- |
 
 ```javascript
 
@@ -103,7 +126,6 @@ Hermes acts as your container for a state heap (store), you can have as many or 
   }
 
 ```
-
 What Hermes attempts to achieve is to turn your state heap into a set of addresses that have urls same as any webpage: 
 
 ```javascript 
@@ -111,7 +133,7 @@ What Hermes attempts to achieve is to turn your state heap into a set of address
   const structure : Object = {
     a : {
       b : {
-        c : 'foo'
+        c : {}
       }
     }
   }
@@ -156,9 +178,7 @@ If you wanted ANY member, your would just pass an ambiguous term like so:
 store.Subscribe(..., ..., 'a/b/:index/c')
 
 ```
-
 When you recieved the event back, you can use the context Object to deviate behaviour based on the index if necessary:
-
 
 ```javascript
 
@@ -183,6 +203,14 @@ store.Do(myReducer.MyAction({some : data}))
 
 Actions are always created via your reducer. See Reducer section
 
+Alternatively, in some situations where the application may have to explicitly decide the path, in which case you can include that as a secondary paramter. Just remember, a context will be needed for the action if any ambiguity is left to the path.
+
+```javascript
+
+store.Do(myReducer.MyAction({some : data}), 'target/path')
+
+```
+
 When passing your Reducers to Hermes, remember that a reducer at any path must be unique, as this helps to improve lookup considerably. Hermes will throw if you attempt to use an instance
 twice, even across multiple Hermes instances
 
@@ -204,7 +232,7 @@ the above is the minimum setup for hermes to work, here we have created a store 
 
 ```javascript
 
-const heap : {
+const heap : Object = {
   my : {
     path : {}
   }
@@ -216,7 +244,7 @@ The instance of MyReducer will take the action payload, and apply it to the heap
 
 ```javascript
 
-const heap : {
+const heap : Object = {
   my : {
     path : {
       some : 'data'
@@ -226,8 +254,8 @@ const heap : {
 
 ```
 
-The intention is you will then have a middleware function that hermes accepts for requests, (graphql, REST) and that the resultant payload 
-from the request will be combined with any payload you pass in from the client (request payload overwriting client parameters of the same name)
+In terms of network communication, Hermes should have no responsibility / dictation over how you choose to communicate with your external data sources. For this reason
+it simply provides a way to hook in requests based on the paths.
 
 Say we have this:
 
@@ -236,11 +264,19 @@ Say we have this:
 const myReducer : MyReducer = new MyReducer
 
 const store : Hermes = new Hermes({
-  paths : {
-    'my/path' : true // This path requires a request to the server
-  }
   reducers : {
     'my/path' : myReducer
+  },
+  remote : {
+    paths : [
+      'my/path'
+    ],
+    request: (path : string, action : Hermes.Action, state : Object, resolve : Function) => {
+      // send some request
+      ... // get a payload of data from a remote source
+
+      resolve(payload) // send that data to hermes as part of the action.
+    }
   }
 })
 
@@ -278,16 +314,25 @@ const heap : {
 
 ```
 
-NOTE: Some thought will be applied to think about how best to manage request methods, it may be that you want to control how data is applied based on the request that is being 
-made. Also, due to the asyncronous nature of these requests, we may need an AsyncReducer class with additional reducer stages for submission (when the request sends) and errors.
+You have two configuration parameters to worry about. 'paths' sets the addresses that requires a remote interaction. it will evaluate based on the path as a prefix, meaning a/b as a remote path, will be
+accepted if an action is initialized at path a/b/c. 
+
+You can custom omit paths by returning exactly false in your request function. You will have full access to the original path, action, and the current state. State is important for mutating data on your remote data source, as you will probably need to send it across. 
 
 ## Reducers
 
-Rather than being single functions, these are now class instances that are responsible for:
+Rather than being single functions like Redux, these are now class instances that are responsible for:
 
 * Reducing the state based on a given action payload
 * Creation of actions
 * Creation of events as a result of actions
+
+| Function | Signature | Returns | Description |
+| -------- | --------- | ------- | ----------- |
+| Reduce   | action : Action, state : Object or Array, payload? : Array or Object | Object or Array | Used to translate previous state into the new state based on Action type |
+| Action   | name : string, payload? : Object, context? : Object | Action | This is used internally to create a new action for dispatch to Hermes. |
+| Dispatch | eventName : string | void | Used to trigger an event on the system, simply takes the event name | 
+| -------- | --------- | ------- | ----------- |
 
 Creating a Reducer is pretty straight forward:
 
@@ -335,29 +380,39 @@ store.Subscribe(Reducer.EVENTS.CHANGE, (event : Object) => {
 
 ```
 
-## To Be Resolved
-
-### Handling Path Matching Better
-
-Currently The Module handles paths a bit literally in matching the reducer to the expression. In literals this is fine but if you were to do something like:
-
-/a/(b|c)
-
-It would be lost
-
-/a/:index works fine, but this is because Hermes matches the ':' character
-
-A better approach is to cache off the regex urls and match them if we cannot rule out a path based on simpler criteria (number of steps, mismatching end key). This means that regex's should be cached off (this is fine as all paths are declared upfront for your reducers) and we should keep a log of matching paths so in future iterations they can be matched more precisely.
-
 ### Reducer Stacking
 
-Say you have 3 paths :
+Because we use paths to delegate Reducers, and paths can cross each other when some are ambiguous, it is entirely possible reducers may overlap. In this event they can stack on your state. Meaning all are applied if many reducers are applicable.
 
-1 : /a/b,
-2 : /a/c,
-3 : /a/:index
+For Example : 
 
-The problem here is both 1 & 3 is correct for /a/b, as is 1 & 2 for /a/c
+```javascript
 
-In this scenario, we should really induce BOTH reducers on the state object. preferably in the order they were declared. The resultant event would contain a mutated object with both applied.
+const store : Hermes = new Hermes({
+  reducers : {
+    'test/specific' : new SpecificReducer,
+    'test/:general' : new GeneralReducer
+  }
+})
+
+```
+In this case, if specific is specified in an action, both are called, in the order they are originally declared. This may help further in specifically applying behaviours without having to repeat your code.
+
+### Init Action
+
+You will probably notice that your reducers may get called with a "__init__" action. This happens when Hermes is unable to determine whether you reducer needs an array or an object as part of it's initial state (sadly using the paths won't cut it, 'test/:path' could denote a dictionary key, or an index on an array). In such an event, as JavaScript is a duck-typed language, and it wouldn't do to have to declare the expected object type, the only thing Hermes can do is test-run your reducer to understand what is expected, in what is returned by default. 
+
+You may want to use this in some way, but otherwise it can be ignored as is meant for internal use.
+
+## Performance
+
+One concern was the use of regex when identifying locations to update data on mass. Running large lists of regex's continually could have a performance impact, and therefore 'reducer caching' has been implemented to ensure that once a path's reducers are known, a record is stored to stop having to re-run them. In this event, first-pass action triggers will invoke a regex test, but after that a dictionary is used to look up the applicable reducers. 
+
+## Further Improvement Notes
+
+Currently, the main concern is the ideas surrounding async server requests injected into state action flow. There may be a requirement to run multiple state updates, one for initial submission, another for successful updating based on network payload, and another for a failure state. It would be entirely possible to update the state based on these network stages, the main question is how best to design the implementation on these further reducer stages.
+
+Unsubscribe is a feature that needs implementing for obvious reasons
+
+Possibly namespacing of event / action names. 
 

@@ -93,7 +93,7 @@ export default class Hermes {
           // Bind a function for accessing the events list. There is one list per Hermes.
           targetReducer.hermes = t
 
-          const current: Object = t.Branch(t.reducerHeap, key.split('/'), (node : Object = Object.create(null), step : string, i : number) => {
+          const current: Object = Branch.call(t, t.reducerHeap, key.split('/'), (node : Object = Object.create(null), step : string, i : number) => {
             node.step = step
             node.position = i + 1
 
@@ -117,40 +117,6 @@ export default class Hermes {
   
     t.map = {} // this will be used to index matching reducers based on paths
   }  
-
-  /**
-   * @name AddEvent
-   * @description The number 
-   * @param {*} name 
-   * @param {*} payload
-   * @param {*} context
-   * @return {Hermes}
-   * @public
-   */
-  AddEvent (name : string) : Hermes {
-    const t : Hermes = this
-
-    if (t.ignoreEvents) {
-      return t
-    }
-
-    t.events.push({name, payload : t.payload, path : t.currentPath, context : t.context})
-
-    return t
-  }
-
-  /**
-   * @name SetContext
-   * @description This marks the current path when a reducer event is fired, along with path params if the path is ambiguous
-   * @param {string} name L 
-   */
-  SetContext (path : string, context : Object, payload : Function) {
-    const t : Hermes = this
-    
-    t.currentPath = path
-    t.context = context
-    t.payload = payload
-  }
 
   Dispatch () {
     const t : Hermes = this
@@ -272,233 +238,265 @@ export default class Hermes {
       throw new Error('Parameter 1 must be an Action instance', action)
     }
     // one time call for the first request of the data
-    return t.Query(pathToRegexp.compile(path || action.Reducer().path)(action.context), action)
-  }
-
-  MatchingReducers (path : string) : Array {
-    const t : Hermes = this
-    const {reducerEnds} = t
-    let reducers : Array
-    
-    if (t.map[path]) { // cuts out having to do regex's more than once on a path.
-      return t.map[path]
-    }
-
-    let i : number = -1
-    const l : number = reducerEnds.length
-
-    while (++i < l) {
-      const reducer : Reducer = reducerEnds[i].reducer
-
-      if (reducer.regex.exec(path) !== null) {
-        (reducers = reducers || []).push(reducer)
-      }
-    }
-
-    return (t.map[path] = reducers)
+    return Query.call(t, pathToRegexp.compile(path || action.Reducer().path)(action.context), action)
   }
 
   /**
-   * @name Query
-   * @description Takes a path and runs a server request if required. Will then apply resultant data on the Action as it's payload for the reducers
-   * @param {string} path: The path that the action will be applied to
-   * @param {Action} action: the action invoked
-   * @return {Promise}
+   * @name AddEvent
+   * @description The number 
+   * @param {*} name 
+   * @param {*} payload
+   * @param {*} context
+   * @return {Hermes}
    * @public
    */
-  async Query (path: string, action: Action): Promise {
-    const t: Hermes = this
+  AddEvent (name : string) : Hermes {
+    const t : Hermes = this
 
-    if (t.verbose) {
-      console.log('getting this path!', path)
+    if (t.ignoreEvents) {
+      return t
     }
 
-    const steps : Array = path.split('/')
-    const OnApply: Function = (payload: Object = Object.create(null)) => {
-      action.payload = payload // Override the payload with the new one given
-
-      // Update the store, and ensure that the new state is in place.
-      t.Update(steps, action)
-
-      // This part, working in parent-first left-to-right, we should trigger any subscribers at each path within the CHANGED heap.
-      //Publish.call(t, steps, action)
-      t.Dispatch()
-    }
-
-    if (!t.remote || !t.remote.paths || !t.remote.paths.length) {
-      OnApply(action.payload)
-      return
-    }
-    
-    const {paths} : Array = t.remote
-
-    let i : number = -1
-    const l : number = paths.length
-
-    let requestPath : string
-
-    while (++i < l) {
-      const item : string = paths[i]
-
-      if (item.re.test(path)) {
-        if (action.context && Object.keys(action.context).length) {
-          requestPath = item.ToPath(action.context)
-        } else {
-          requestPath = item.originalPath
-        }
-        break
-      }
-    }
-
-    if (!requestPath) {
-      // this is not a requestable piece of data!
-      OnApply(action.payload)
-      return
-    }
-
-    try { // we want to launch a new promise, which 
-      let state : Object
-      
-      t.Branch(t.store, steps, (node : Object) => {
-        return (state = node || Object.create(null))
-      })
-
-      const result : Object = await new Promise ((resolve : Function, reject : Function) => {
-        if(t.remote.request(requestPath, action, state, (payload : Object) => resolve && resolve({...action.payload, ...payload})) === false) {
-          resolve(action.payload)
-        }
-      })
-
-      OnApply(result)
-    } catch (error) {
-      console.warn('Request failed in the network', error)
-      OnApply({error : 'Request Failed'})
-    }
-  }
-
-  /**
-   * @name Update
-   * @description This follows the designated path along each step in the heap's branch, and then applies the data
-   * heap to the store from there 
-   * @param {Array} steps: The path represented as an array of keys
-   * @param {Action} action: The action to perform on the heap
-   * @return {Hermes}
-   */
-  Update (steps: Array, action: Action) : Hermes {
-    const t: Hermes = this
-
-    function OnStep (node : Object, path : Array, payload : Object) {
-      const strPath : string = path.join('/')
-      const result = t.MatchingReducers(strPath) || [t.reducer] // look for an exact path match in the reducers
-
-      let state : Object | Array = node 
-      
-      if (!state) {
-        t.ignoreEvents = true
-        state = result[0].Reduce(new Action('__init__'))
-        // remove events created as a result.
-        t.ignoreEvents = false
-      }
-
-      t.SetContext(strPath, action.context, function () {
-        return state
-      })
-
-      let i : number = -1
-      const l : number = result.length
-
-      while (++i < l) {
-        state = result[i].Reduce(action, state, payload)
-      }
-
-      return state
-    }
-
-    // we need to update the branch for the store where the path is concerned
-    // no payload as this is just a path update
-    const store: Object = t.Branch(t.store, steps, (node : Object, step : string, i : number) : Object => {
-      return OnStep(node, steps.slice(0, i + 1), i === steps.length - 1 ? action.payload : undefined)
-    })
-
-    // then the returned heap needs to be updated (tree structure, no longer branch path)
-    // payloads exist because we are now in the returned object heap. 
-    t.Tree(store, action.payload, (node : Object, payload : Object, keys : Array) : Object => {
-      return OnStep(node, [...steps, ...keys], payload)
-    }, t.reducerHeap)
+    t.events.push({name, payload : t.payload, path : t.currentPath, context : t.context})
 
     return t
-  }
-
-  Tree (target: Object, heap: Object | Array, onNode?: callback, keys: Array = []) : Object {
-    const t : Hermes = this
-
-    if (toString.call(heap) === ARRAY) {
-      let i : number = -1
-      let member : any
-
-      while ((member = heap[++i])) {
-        if (typeof member !== 'object') {
-          continue
-        }
-
-        const childKeys : Array = [...keys, i]
-        const typeString : string = toString.call(member)
-
-        target[i] = onNode(target[i], member, childKeys)
-        target[i] = t.Tree(target[i] || (typeString === ARRAY ? new Array(member.length) : Object.create(null)), member, onNode, childKeys)
-      }
-
-      return target
-    }
-
-    for (let key in heap) {
-      let node: any = heap[key]
-      const typeString : string = toString.call(node)
-
-      if (typeString === OBJECT || typeString === ARRAY) {
-        const childKeys: Array = [...keys, key]
-
-        target[key] = onNode(target[key], node, childKeys)
-        target[key] = t.Tree(target[key] || (typeString === ARRAY ? new Array(node.length) : Object.create(null)), node, onNode, childKeys)
-      }
-    }
-
-    return target
-  }
-
-  Branch (target: Object, steps: Array, onNode?: callback, parenting: boolean = false): Object {
-    const t : Hermes = this
-
-    // our store needs to be updated with the values
-    let i: number = -1
-    const l: number = steps.length
-
-    onNode = onNode || OnNode
-
-    while (++i < l) {
-      const step: string = steps[i]
-
-      if (!step) {
-        continue
-      }
-
-      console.log('bah!', target[step])
-
-      target[step] = onNode(target[step], step, i)
-
-      if (parenting) {
-        target[step].parent = target
-      }
-
-      target = target[step]
-    }
-
-    return target
   }
 
   Print () {
     console.log(this.store)
   }
+}
+
+/**
+ * @name SetContext
+ * @description This marks the current path when a reducer event is fired, along with path params if the path is ambiguous
+ * @param {string} name L 
+ */
+function SetContext (path : string, context : Object, payload : Function) {
+  const t : Hermes = this
+  
+  t.currentPath = path
+  t.context = context
+  t.payload = payload
+}
+
+function MatchingReducers (path : string) : Array {
+  const t : Hermes = this
+  const {reducerEnds} = t
+  let reducers : Array
+  
+  if (t.map[path]) { // cuts out having to do regex's more than once on a path.
+    return t.map[path]
+  }
+
+  let i : number = -1
+  const l : number = reducerEnds.length
+
+  while (++i < l) {
+    const reducer : Reducer = reducerEnds[i].reducer
+
+    if (reducer.regex.exec(path) !== null) {
+      (reducers = reducers || []).push(reducer)
+    }
+  }
+
+  return (t.map[path] = reducers)
+}
+
+/**
+ * @name Query
+ * @description Takes a path and runs a server request if required. Will then apply resultant data on the Action as it's payload for the reducers
+ * @param {string} path: The path that the action will be applied to
+ * @param {Action} action: the action invoked
+ * @return {Promise}
+ * @public
+ */
+async function Query (path: string, action: Action): Promise {
+  const t: Hermes = this
+
+  if (t.verbose) {
+    console.log('getting this path!', path)
+  }
+
+  const steps : Array = path.split('/')
+  const OnApply: Function = (payload: Object = Object.create(null)) => {
+    action.payload = payload // Override the payload with the new one given
+
+    // Update the store, and ensure that the new state is in place.
+    Update.call(t, steps, action)
+
+    // This part, working in parent-first left-to-right, we should trigger any subscribers at each path within the CHANGED heap.
+    //Publish.call(t, steps, action)
+    t.Dispatch()
+  }
+
+  if (!t.remote || !t.remote.paths || !t.remote.paths.length) {
+    OnApply(action.payload)
+    return
+  }
+  
+  const {paths} : Array = t.remote
+
+  let i : number = -1
+  const l : number = paths.length
+
+  let requestPath : string
+
+  while (++i < l) {
+    const item : string = paths[i]
+
+    if (item.re.test(path)) {
+      if (action.context && Object.keys(action.context).length) {
+        requestPath = item.ToPath(action.context)
+      } else {
+        requestPath = item.originalPath
+      }
+      break
+    }
+  }
+
+  if (!requestPath) {
+    // this is not a requestable piece of data!
+    OnApply(action.payload)
+    return
+  }
+
+  try { // we want to launch a new promise, which 
+    let state : Object
+    
+    Branch.call(t, t.store, steps, (node : Object) => {
+      return (state = node || Object.create(null))
+    })
+
+    const result : Object = await new Promise ((resolve : Function, reject : Function) => {
+      if(t.remote.request(requestPath, action, state, (payload : Object) => resolve && resolve({...action.payload, ...payload})) === false) {
+        resolve(action.payload)
+      }
+    })
+
+    OnApply(result)
+  } catch (error) {
+    console.warn('Request failed in the network', error)
+    OnApply({error : 'Request Failed'})
+  }
+}
+
+/**
+ * @name Update
+ * @description This follows the designated path along each step in the heap's branch, and then applies the data
+ * heap to the store from there 
+ * @param {Array} steps: The path represented as an array of keys
+ * @param {Action} action: The action to perform on the heap
+ * @return {Hermes}
+ */
+function Update (steps: Array, action: Action) : Hermes {
+  const t: Hermes = this
+
+  function OnStep (node : Object, path : Array, payload : Object) {
+    const strPath : string = path.join('/')
+    const result = MatchingReducers.call(t, strPath) || [t.reducer] // look for an exact path match in the reducers
+
+    let state : Object | Array = node 
+    
+    if (!state) {
+      t.ignoreEvents = true
+      state = result[0].Reduce(new Action('__init__'))
+      // remove events created as a result.
+      t.ignoreEvents = false
+    }
+
+    SetContext.call(t, strPath, action.context, function () {
+      return state
+    })
+
+    let i : number = -1
+    const l : number = result.length
+
+    while (++i < l) {
+      state = result[i].Reduce(action, state, payload)
+    }
+
+    return state
+  }
+
+  // we need to update the branch for the store where the path is concerned
+  // no payload as this is just a path update
+  const store: Object = Branch.call(t, t.store, steps, (node : Object, step : string, i : number) : Object => {
+    return OnStep(node, steps.slice(0, i + 1), i === steps.length - 1 ? action.payload : undefined)
+  })
+
+  // then the returned heap needs to be updated (tree structure, no longer branch path)
+  // payloads exist because we are now in the returned object heap. 
+  Tree.call(t, store, action.payload, (node : Object, payload : Object, keys : Array) : Object => {
+    return OnStep(node, [...steps, ...keys], payload)
+  }, t.reducerHeap)
+
+  return t
+}
+
+function Tree (target: Object, heap: Object | Array, onNode?: callback, keys: Array = []) : Object {
+  const t : Hermes = this
+
+  if (toString.call(heap) === ARRAY) {
+    let i : number = -1
+    let member : any
+
+    while ((member = heap[++i])) {
+      if (typeof member !== 'object') {
+        continue
+      }
+
+      const childKeys : Array = [...keys, i]
+      const typeString : string = toString.call(member)
+
+      target[i] = onNode(target[i], member, childKeys)
+      target[i] = Tree.call(t, target[i] || (typeString === ARRAY ? new Array(member.length) : Object.create(null)), member, onNode, childKeys)
+    }
+
+    return target
+  }
+
+  for (let key in heap) {
+    let node: any = heap[key]
+    const typeString : string = toString.call(node)
+
+    if (typeString === OBJECT || typeString === ARRAY) {
+      const childKeys: Array = [...keys, key]
+
+      target[key] = onNode(target[key], node, childKeys)
+      target[key] = Tree.call(t, target[key] || (typeString === ARRAY ? new Array(node.length) : Object.create(null)), node, onNode, childKeys)
+    }
+  }
+
+  return target
+}
+
+function Branch (target: Object, steps: Array, onNode?: callback, parenting: boolean = false): Object {
+  const t : Hermes = this
+
+  // our store needs to be updated with the values
+  let i: number = -1
+  const l: number = steps.length
+
+  onNode = onNode || OnNode
+
+  while (++i < l) {
+    const step: string = steps[i]
+
+    if (!step) {
+      continue
+    }
+
+    target[step] = onNode(target[step], step, i)
+
+    if (parenting) {
+      target[step].parent = target
+    }
+
+    target = target[step]
+  }
+
+  return target
 }
 
 function OnNode (node: Object) { // stops inline creation of objects in branch

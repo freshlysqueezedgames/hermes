@@ -100,6 +100,13 @@ const store : Hermes = new Hermes({
       'my/path' // list paths that a request to a remote server is used for
     ],
     request : (path : string, action : Hermes.Action, state : Object, resolve : Function) => {
+      if (action.name === 'some.name') {
+        ... // make a request
+
+        resolve({your : 'payload'}) // return an object containing state data
+        return
+      }
+
       return false // returning false indicates no request is needed
     }
   }
@@ -108,13 +115,13 @@ const store : Hermes = new Hermes({
 ```
 ### Important Notes
 
-1: Reducers must be unique instances at each route (even between different stores)
-2: An initialize action sometimes happens with reducers if Hermes needs to determines whether state is expected to be an array or object. Events triggered on this pass will be ignored by the system.
-3: Any path-to-regexp expression can be used, and the context object on the action will have the parsed keys.
-4: More than one reducer can match a particular path, and they will all be called in the order they were declared to Hermes
-5: Returned event state is the culmination of all matching reducers for an action path, regardless of when they are triggered
-6: You Subscribe to events, not actions
-7: You can declare as many events as you like inside your reducers
+1. Reducers must be unique instances at each route (even between different stores)
+2. An initialize action sometimes happens with reducers if Hermes needs to determines whether state is expected to be an array or object. Events triggered on this pass will be ignored by the system.
+3. Any path-to-regexp expression can be used, and the context object on the action will have the parsed keys.
+4. More than one reducer can match a particular path, and they will all be called in the order they were declared to Hermes
+5. Returned event state is the culmination of all matching reducers for an action path, regardless of when they are triggered
+6. You Subscribe to events, not actions
+7. You can declare as many events as you like inside your reducers
 
 ## Hermes Class
 
@@ -457,9 +464,9 @@ In this case, if specific is specified in an action, both are called, in the ord
 
 Actions are always created through the reducer they are relevant to, and are created internally by the system, this means all you have to do is call Action and pass though three parameters:
 
-1: The Action Name
-2: The Action Payload
-3: The Action Context
+1. The Action Name
+2. The Action Payload
+3. The Action Context
 
 2 & 3 are not mandatory, payload will effect the state, context indicates to your reducer along what path it has been called.
 

@@ -470,8 +470,6 @@ describe('#Hermes', () => {
   })
 
   test('Should preserve original values from the state for arrays', (done : Function) => {
-    console.log('beans of nazareth')
-
     const testArrayReducer : TestArrayReducer = new TestArrayReducer
     const childReducer : TestReducer = new TestReducer
 
@@ -484,15 +482,11 @@ describe('#Hermes', () => {
 
     store.Do(childReducer.Change({test : 'test'}, {index : 0}))
 
-    console.log('now we update')
-
     const mock : Jest.Mock = jest.fn().mockImplementation((event : Object) => {
       expect(event.payload).toMatchObject({
         test : 'test',
         test2 : 'test2'
       })
-
-      console.log('beans alive!', event.payload)
 
       done()
 
@@ -509,5 +503,74 @@ describe('#Hermes', () => {
     store.Subscribe(TestArrayReducer.EVENTS.CHANGE, mock2)
 
     store.Do(childReducer.Change({test2 : 'test2'}, {index : 0}))
+  })
+
+  test('Should not trigger subscriptions once they have been removed', () => {
+    const testReducer : TestArrayReducer = new TestArrayReducer
+
+    const store = new Hermes({
+      reducers : {
+        'test' : testReducer
+      }
+    })
+
+    const mock : Jest.Mock = jest.fn()
+
+    store.Subscribe(TestReducer.EVENTS.CHANGE, mock)
+
+    store.Do(testReducer.Change({test : 'test'}))    
+
+    store.Unsubscribe(TestArrayReducer.EVENTS.CHANGE, mock)
+
+    store.Do(testReducer.Change({test : 'test2'}))
+
+    expect(mock).toHaveBeenCalledTimes(1)
+  })
+
+  test('Should remove all subscriptions', () => {
+    const testReducer : TestReducer = new TestReducer
+
+    const store = new Hermes({
+      reducers : {
+        'test' : testReducer
+      }
+    })
+
+    const mock : Jest.Mock = jest.fn()
+
+    store.Subscribe(TestReducer.EVENTS.CHANGE, mock)
+    store.Subscribe(TestReducer.EVENTS.CHANGE, mock)
+
+    store.Do(testReducer.Change({test : 'test'}))    
+
+    store.Unsubscribe(TestArrayReducer.EVENTS.CHANGE, mock)
+
+    store.Do(testReducer.Change({test : 'test2'}))
+
+    expect(mock).toHaveBeenCalledTimes(2)
+  })
+
+  test('Should remove all subscriptions if no callback defined', () => {
+    const testReducer : TestReducer = new TestReducer
+
+    const store = new Hermes({
+      reducers : {
+        'test' : testReducer
+      }
+    })
+
+    const mock : Jest.Mock = jest.fn()
+
+    store.Subscribe(TestReducer.EVENTS.CHANGE, mock)
+    store.Subscribe(TestReducer.EVENTS.CHANGE, mock)
+    store.Subscribe(TestReducer.EVENTS.CHANGE, mock)
+
+    store.Do(testReducer.Change({test : 'test'}))
+
+    store.Unsubscribe(TestArrayReducer.EVENTS.CHANGE)
+
+    store.Do(testReducer.Change({test : 'test2'}))
+
+    expect(mock).toHaveBeenCalledTimes(3)
   })
 })

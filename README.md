@@ -14,31 +14,35 @@ you can play around with [testing different paths here](https://forbeslindesay.g
 
 If you just want to get into using this straight away...
 
+### Make A Reducer
+
 Create your reducers like so : 
 
 ```javascript
 class MyReducer extends Reducer {
   static ACTIONS : Object = { // Setup an index of actions
-    CHANGE : 'testreducer.change'
+    CHANGE : 'myreducer.change'
   }
   
   static EVENTS : Object = { // Also an index of events
-    CHANGE : 'testreducer.change'
+    CHANGE : 'myreducer.change'
   }
 
   // Overwrite the Reducer function, which accepts the action, the state and the payload
   Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {  
-    this.Dispatch(TestReducer.EVENTS.CHANGE) // dispatch your event, which will be passed to listening subscribers
+    this.Dispatch(MyReducer.EVENTS.CHANGE) // dispatch your event, which will be passed to listening subscribers
 
     return {...state, ...payload}
   }
 
   Change (payload : Object) { // Create functions that invoke actions. Actions are created with the reducers base class and must be built this way.
-    return this.Action(TestReducer.ACTIONS.CHANGE, payload)
+    return this.Action(MyReducer.ACTIONS.CHANGE, payload)
   }
 }
 
 ```
+
+### Create a Hermes Store
 
 And pass them to your Hermes instance like so:
 
@@ -62,6 +66,26 @@ store.Subscribe(MyReducer.EVENTS.CHANGE, (event : Object) => {
 store.Do(myReducer.Change({some : 'data'}))
 
 ```
+### Describe Your Actions
+
+Actions must be created via the Action function on the Reducer baseclass. It is recommended to create functions that call this internally like so:
+
+```javascript
+class MyReducer {
+  ...
+
+  // path is test/:index
+  Change (data1 : string, data2 : string, index : number) : Hermes.Action {
+    return this.Action(MyReducer.ACTION.SOMETHING, {data1, data2}, {index})
+  }
+
+  ...
+}
+```
+
+Creating an action takes a name, a payload object, and a context, if your path is literal (as in does not have ambigous parts to it) then you can leave this empty. Similarly, a payload is not required.
+
+### Hook In A Network Callback
 
 To integrate network communication, you can use a remote configuration, like so:
 
@@ -82,6 +106,15 @@ const store : Hermes = new Hermes({
 })
 
 ```
+### Important Notes
+
+1: Reducers must be unique instances at each route (even between different stores)
+2: An initialize action sometimes happens with reducers if Hermes needs to determines whether state is expected to be an array or object. Events triggered on this pass will be ignored by the system.
+3: Any path-to-regexp expression can be used, and the context object on the action will have the parsed keys.
+4: More than one reducer can match a particular path, and they will all be called in the order they were declared to Hermes
+5: Returned event state is the culmination of all matching reducers for an action path, regardless of when they are triggered
+6: You Subscribe to events, not actions
+7: You can declare as many events as you like inside your reducers
 
 ## Hermes Class
 
@@ -90,8 +123,9 @@ Hermes acts as your container for a state heap (store), you can have as many or 
 | Function | Signature | Returns | Description |
 | -------- | --------- | ------- | ----------- |
 | Subscribe | name: string, callback: Function, path? : string, projection?: Object | Hermes | This function subscribes to events on a particular reducer. |
+| Unsubscribe | name : string, callback? : Function | Hermes | This allows you to remove a subscription to an event
 | Do        | action: Action, path? : string | Promise | Launches an action on the state heap, resolves when complete |
-| -------- | --------- | ------- | ----------- |
+| Print | | Hermes | console logs your current state heap.
 
 ```javascript
 
@@ -101,7 +135,7 @@ Hermes acts as your container for a state heap (store), you can have as many or 
   let instance : YourManagementClass
 
   class YourManagementClass {
-    constructor () {
+    constructor (props? : Object) {
       super(props)
 
       if (instance) {
@@ -141,6 +175,8 @@ What Hermes attempts to achieve is to turn your state heap into a set of address
   const addressToC : string = 'a/b/c' // this path would generate the above
 
 ```
+
+### Subscribe
 
 You can subscribe to events at particular addresses by using the Subscribe function: 
 
@@ -192,6 +228,26 @@ store.Subscribe(..., (event : Object) => {
 }, 'a/b/:index/c')
 
 ```
+
+### Unsubscribe
+
+You can unsubscribe to events using this function, simply state the name of the event you want to unsubscribe to, and the original event you want to unsubscribe from.
+
+```javascript
+
+  store.Unsubcribe(MyReducer.EVENTS.CHANGE, mylistener) // removes just this function.
+
+```
+
+If you want to unsubscribe from the event in it's entirety, just pass in the event name
+
+```javascript
+  
+  store.Unsubcribe(MyReducer.EVENTS.CHANGE) // remove all
+
+```
+
+### Do
 
 You invoke an action using the Do method, and must pass it an action that has been created via your reducer:
 
@@ -331,8 +387,7 @@ Rather than being single functions like Redux, these are now class instances tha
 | -------- | --------- | ------- | ----------- |
 | Reduce   | action : Action, state : Object or Array, payload? : Array or Object | Object or Array | Used to translate previous state into the new state based on Action type |
 | Action   | name : string, payload? : Object, context? : Object | Action | This is used internally to create a new action for dispatch to Hermes. |
-| Dispatch | eventName : string | void | Used to trigger an event on the system, simply takes the event name | 
-| -------- | --------- | ------- | ----------- |
+| Dispatch | eventName : string | void | Used to trigger an event on the system, simply takes the event name |
 
 Creating a Reducer is pretty straight forward:
 
@@ -398,6 +453,28 @@ const store : Hermes = new Hermes({
 ```
 In this case, if specific is specified in an action, both are called, in the order they are originally declared. This may help further in specifically applying behaviours without having to repeat your code.
 
+## Actions
+
+Actions are always created through the reducer they are relevant to, and are created internally by the system, this means all you have to do is call Action and pass though three parameters:
+
+1: The Action Name
+2: The Action Payload
+3: The Action Context
+
+2 & 3 are not mandatory, payload will effect the state, context indicates to your reducer along what path it has been called.
+
+Signature is:
+
+```javascript
+
+Action (name : string, payload : Object = Object.create(null), context : Object = Object.create(null)) : Hermes.Action
+
+```
+
+## Events
+
+Events are triggered when you call Dispatch inside your reductions. Note you only give the name, and do not pass any data. This is intentional, as what will be returned by hermes once reduction is complete is the resultant state. As you can have multiple reducers on a particular path, it is important that no state data is given to listeners until all changes have been made.
+
 ### Init Action
 
 You will probably notice that your reducers may get called with a "__init__" action. This happens when Hermes is unable to determine whether you reducer needs an array or an object as part of it's initial state (sadly using the paths won't cut it, 'test/:path' could denote a dictionary key, or an index on an array). In such an event, as JavaScript is a duck-typed language, and it wouldn't do to have to declare the expected object type, the only thing Hermes can do is test-run your reducer to understand what is expected, in what is returned by default. 
@@ -411,8 +488,6 @@ One concern was the use of regex when identifying locations to update data on ma
 ## Further Improvement Notes
 
 Currently, the main concern is the ideas surrounding async server requests injected into state action flow. There may be a requirement to run multiple state updates, one for initial submission, another for successful updating based on network payload, and another for a failure state. It would be entirely possible to update the state based on these network stages, the main question is how best to design the implementation on these further reducer stages.
-
-Unsubscribe is a feature that needs implementing for obvious reasons
 
 Possibly namespacing of event / action names. 
 

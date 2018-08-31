@@ -116,78 +116,6 @@ export default class Hermes {
     t.reducer.hermes = t
   
     t.map = {} // this will be used to index matching reducers based on paths
-  }  
-
-  Dispatch () {
-    const t : Hermes = this
-    let i : number = -1
-    let event : Object
-
-    while ((event = t.events[++i])) {
-      if (!t.callbacks[event.name]) {
-        continue
-      }
-
-      const list : Array = t.callbacks[event.name]
-
-      let j : number = -1
-      let callback
-
-      while ((callback = list[++j])) {
-        let result : Array
-
-        if (callback.regex && !(result = callback.regex.exec(event.path))) {
-          continue
-        }
-
-        let content : Object = {...event}
-
-        if (callback.projection) {
-          const payload : Object = Object.create(null)
-
-          for (let key in callback.projection) {
-            const item : Array = callback.projection[key]
-            let target : any = event.payload()
-            let i : number = 0
-            const l : number = item.length
-
-            while((target = target[item[i++]]) && i < l);
-
-            payload[key] = target
-          }
-
-          content.payload = payload
-        } else {
-          content.payload = content.payload() // invoke this to collect the resultant state, and remove the reference for GC
-        }
-
-        const keys : Array = callback.keys
-
-        if (keys && keys.length) { // if the urls have keys, we need to gather the values so we can show the context
-          const context : Object = Object.create(null)
-
-          result.shift()
-
-          let i : number = keys.length
-
-          while (i--) {
-            context[keys[i].name] = result[i]
-          }
-
-          content.context = context
-        }
-
-        if (callback(content)) {
-          list.splice(j--, 1)
-        }
-      }
-    }
-
-    t.events = []
-    t.currentPath = ''
-    
-    t.payload = null
-    t.context = null
   }
   
   /**
@@ -195,18 +123,13 @@ export default class Hermes {
    * @description Applies a listener to 
    * @param {*} name 
    * @param {*} callback
-   * @param {*} context 
-   * @param {*} projection 
+   * @param {*} context
    */
-  Subscribe (name: string, callback: Function, path? : string, projection?: Object): Hermes {
+  Subscribe (name: string, callback: Function, path? : string): Hermes {
     const t: Hermes = this
 
     if (!name || typeof name !== 'string' || toString.call(callback) !== FUNCTION) {
       throw new Error('you must always call Subscribe with a string path and a callback function')
-    }
-
-    for (let key in projection) {
-      projection[key] = projection[key].split('/')
     }
 
     const list : Array = t.callbacks[name] = t.callbacks[name] || [] // create a new array if there isn't one
@@ -216,9 +139,31 @@ export default class Hermes {
       callback.regex = pathToRegexp(path, callback.keys)
     }
 
-    callback.projection = projection
-
     list.push(callback)
+
+    return t
+  }
+
+  Unsubscribe (name : string, callback? : Function) : Hermes {
+    const t : Hermes = this
+    const list : Array = t.callbacks[name]
+
+    if (!list) {
+      return t
+    }
+
+    if (typeof callback === 'undefined') {
+      delete t.callbacks[name]
+      return t
+    }
+
+    let i : number = list.length
+
+    while (i--) {
+      const item : Object = list[i]
+
+      item === callback && list.splice(i, 1) // could be more than one subscription of this I suppose...
+    }
 
     return t
   }
@@ -262,9 +207,65 @@ export default class Hermes {
     return t
   }
 
-  Print () {
+  Print () : Hermes {
     console.log(this.store)
+    return this
   }
+}
+
+function Dispatch () {
+  const t : Hermes = this
+  let i : number = -1
+  let event : Object
+
+  while ((event = t.events[++i])) {
+    if (!t.callbacks[event.name]) {
+      continue
+    }
+
+    const list : Array = t.callbacks[event.name]
+
+    let j : number = -1
+    let callback
+
+    while ((callback = list[++j])) {
+      let result : Array
+
+      if (callback.regex && !(result = callback.regex.exec(event.path))) {
+        continue
+      }
+
+      let content : Object = {...event}
+
+      content.payload = content.payload() // invoke this to collect the resultant state, and remove the reference for GC
+
+      const keys : Array = callback.keys
+
+      if (keys && keys.length) { // if the urls have keys, we need to gather the values so we can show the context
+        const context : Object = Object.create(null)
+
+        result.shift()
+
+        let i : number = keys.length
+
+        while (i--) {
+          context[keys[i].name] = result[i]
+        }
+
+        content.context = context
+      }
+
+      if (callback(content)) {
+        list.splice(j--, 1)
+      }
+    }
+  }
+
+  t.events = []
+  t.currentPath = ''
+  
+  t.payload = null
+  t.context = null
 }
 
 /**
@@ -327,7 +328,7 @@ async function Query (path: string, action: Action): Promise {
 
     // This part, working in parent-first left-to-right, we should trigger any subscribers at each path within the CHANGED heap.
     //Publish.call(t, steps, action)
-    t.Dispatch()
+    Dispatch.call(t)
   }
 
   if (!t.remote || !t.remote.paths || !t.remote.paths.length) {

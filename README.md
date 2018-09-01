@@ -132,6 +132,7 @@ Hermes acts as your container for a state heap (store), you can have as many or 
 | Subscribe | name: string, callback: Function, path? : string, projection?: Object | Hermes | This function subscribes to events on a particular reducer. |
 | Unsubscribe | name : string, callback? : Function | Hermes | This allows you to remove a subscription to an event
 | Do        | action: Action, path? : string | Promise | Launches an action on the state heap, resolves when complete |
+| GetState | | Object | Returns the current state of the application
 | Print | | Hermes | console logs your current state heap.
 
 ```javascript
@@ -497,4 +498,6 @@ One concern was the use of regex when identifying locations to update data on ma
 Currently, the main concern is the ideas surrounding async server requests injected into state action flow. There may be a requirement to run multiple state updates, one for initial submission, another for successful updating based on network payload, and another for a failure state. It would be entirely possible to update the state based on these network stages, the main question is how best to design the implementation on these further reducer stages.
 
 Possibly namespacing of event / action names. 
+
+Perhaps a backtracking facility, with configuration for how many versions of the state are stored.
 

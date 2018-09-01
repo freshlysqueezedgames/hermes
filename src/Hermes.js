@@ -207,6 +207,10 @@ export default class Hermes {
     return t
   }
 
+  GetState () : Object {
+    return this.store
+  }
+
   Print () : Hermes {
     console.log(this.store)
     return this

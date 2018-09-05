@@ -153,7 +153,6 @@ Hermes acts as your container for a state heap (store), you can have as many or 
       const t : YourManagementClass = this
 
       store = new Hermes({
-        // [...paths]
         // [...reducers]
       })
 
@@ -495,9 +494,14 @@ One concern was the use of regex when identifying locations to update data on ma
 
 ## Further Improvement Notes
 
-Currently, the main concern is the ideas surrounding async server requests injected into state action flow. There may be a requirement to run multiple state updates, one for initial submission, another for successful updating based on network payload, and another for a failure state. It would be entirely possible to update the state based on these network stages, the main question is how best to design the implementation on these further reducer stages.
+1. Currently, the main concern is the ideas surrounding async server requests injected into state action flow. There may be a requirement to run multiple state updates, one for initial submission, another for successful updating based on network payload, and another for a failure state. It would be entirely possible to update the state based on these network stages, the main question is how best to design the implementation on these further reducer stages.
 
-Possibly namespacing of event / action names. 
+2. Possibly namespacing of event / action names. 
 
-Perhaps a backtracking facility, with configuration for how many versions of the state are stored.
+3. Perhaps a backtracking facility, with configuration for how many versions of the state are stored.
+
+4. Payload and action.payload need to be looked at. Probably could be combined into same thing, but need to check against use cases.
+
+5. Recursive reducers can be difficult to distinguish against when performing reductions.
+
 

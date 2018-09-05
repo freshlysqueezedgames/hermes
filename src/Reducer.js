@@ -1,7 +1,8 @@
 import Action from './Action'
 
 const {toString} = Object.prototype
-const ARRAY = '[object Array]' 
+const ARRAY : string = '[object Array]' 
+const OBJECT : string = '[object Object]'
 
 export default class Reducer {
   static EVENTS : Object = {
@@ -31,7 +32,14 @@ export default class Reducer {
       return state
     }
 
-    return toString.call(state) === ARRAY ? [...payload] : {...state, ...payload}
+    const stateType = toString.call(state)
+    const payloadType = toString.call(payload)
+
+    if (stateType !== payloadType) {
+      return payloadType === ARRAY ? [...payload] : {...payload}
+    }
+
+    return stateType === ARRAY ? [...payload] : {...state, ...payload}
   }
 
   /**

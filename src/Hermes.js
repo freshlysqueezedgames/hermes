@@ -452,10 +452,9 @@ function Tree (target: Object, heap: Object | Array, onNode?: callback, keys: Ar
       }
 
       const childKeys : Array = [...keys, i]
-      const typeString : string = toString.call(member)
 
       target[i] = onNode(target[i], member, childKeys)
-      target[i] = Tree.call(t, target[i] || (typeString === ARRAY ? new Array(member.length) : Object.create(null)), member, onNode, childKeys)
+      target[i] = Tree.call(t, target[i] || (toString.call(member) === ARRAY ? new Array(member.length) : Object.create(null)), member, onNode, childKeys)
     }
 
     return target

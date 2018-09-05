@@ -1,5 +1,6 @@
 import Hermes from './Hermes'
 import Reducer from './Reducer'
+import Action from './Action'
 
 describe('#Hermes', () => {
   class TestReducer extends Reducer {
@@ -315,8 +316,6 @@ describe('#Hermes', () => {
   })
 
   test('Subscribers and Reducers can both match by ambiguous paths', () => {
-    console.log('next!')
-
     class ContextReducer extends Reducer {
       static ACTIONS : Object = {
         CHANGE : 'contextreducer.change'
@@ -401,8 +400,6 @@ describe('#Hermes', () => {
   })
 
   test('Should be able to accept a plugin object with paths and a request function', (done : Function) => {
-    console.log('the world of the bean')
-
     const testReducer : TestReducer = new TestReducer
 
     const hermes : Hermes = new Hermes({
@@ -572,5 +569,75 @@ describe('#Hermes', () => {
     store.Do(testReducer.Change({test : 'test2'}))
 
     expect(mock).toHaveBeenCalledTimes(3)
+  })
+
+  test('Should adapt to changes in state structure', () => {
+    const testReducer : TestReducer = new TestReducer
+
+    const store = new Hermes({})
+
+    const mock : Jest.Mock = jest.fn()
+
+    store.Do(new Action('test.change', {test : 'test'}), 'test')
+    
+    let state : Object = store.GetState()
+
+    expect(state).toMatchObject({
+      test : {
+        test : 'test'
+      }
+    })
+
+    store.Do(new Action('test.change', ['test1']), 'test')
+
+    state = store.GetState()
+
+    expect(state).toMatchObject({
+      test: [
+        'test1'
+      ]
+    })
+
+    store.Do(new Action('test.change', {test : 'test'}), 'test')
+
+    state = store.GetState()
+
+    expect(state).toMatchObject({
+      test : {
+        test : 'test'
+      }
+    })
+  })
+
+  test('Should adapt to changes in state structure at a nested level', () => {
+    const testReducer : TestReducer = new TestReducer
+
+    const store = new Hermes({})
+
+    const mock : Jest.Mock = jest.fn()
+
+    store.Do(new Action('test.change', {test : {test : 'test'}}), 'test')
+    
+    let state : Object = store.GetState()
+
+    expect(state).toMatchObject({
+      test : {
+        test : {
+          test : 'test'
+        }
+      }
+    })
+
+    store.Do(new Action('test.change', ['test1']), 'test/test')
+
+    state = store.GetState()
+
+    expect(state).toMatchObject({
+      test : {
+        test: [
+          'test1'
+        ]
+      }
+    })
   })
 })

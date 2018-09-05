@@ -60,4 +60,18 @@ describe('#Reducer', () => {
     expect(mock).toHaveBeenCalledTimes(1)
     expect(mock).toHaveBeenCalledWith(eventName)
   })
+
+  test('Should accept array to object type changes to the payload', () => {
+    const reducer : Reducer = new Reducer()
+
+    let state : Object = reducer.Reduce(reducer.Action('test.action'), ['test1'], {test : 1})
+
+    expect(state).toMatchObject({
+      test : 1
+    })
+
+    state = reducer.Reduce(reducer.Action('test.action'), {test : 1}, ['test1'])
+
+    expect(state).toMatchObject(['test1'])
+  })
 })

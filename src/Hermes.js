@@ -453,8 +453,8 @@ function Tree (target: Object, heap: Object | Array, onNode?: callback, keys: Ar
 
       const childKeys : Array = [...keys, i]
 
-      target[i] = onNode(target[i], member, childKeys)
       target[i] = Tree.call(t, target[i] || (toString.call(member) === ARRAY ? new Array(member.length) : Object.create(null)), member, onNode, childKeys)
+      target[i] = onNode(target[i], member, childKeys)
     }
 
     return target
@@ -467,8 +467,8 @@ function Tree (target: Object, heap: Object | Array, onNode?: callback, keys: Ar
     if (typeString === OBJECT || typeString === ARRAY) {
       const childKeys: Array = [...keys, key]
 
-      target[key] = onNode(target[key], node, childKeys)
       target[key] = Tree.call(t, target[key] || (typeString === ARRAY ? new Array(node.length) : Object.create(null)), node, onNode, childKeys)
+      target[key] = onNode(target[key], node, childKeys)
     }
   }
 

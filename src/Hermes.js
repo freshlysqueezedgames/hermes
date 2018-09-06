@@ -105,7 +105,12 @@ export default class Hermes {
           current.reducer = targetReducer
 
           targetReducer.path = key
-          targetReducer.regex = pathToRegexp(key)
+          targetReducer.keys = []
+          targetReducer.regex = pathToRegexp(key, targetReducer.keys)
+
+          targetReducer.keys = targetReducer.keys.map((key : Object) => {
+            return key.name
+          })
         }
       }
     } else if (props.verbose) {
@@ -417,9 +422,32 @@ function Update (steps: Array, action: Action) : Hermes {
     let i : number = -1
     const l : number = result.length
 
+    const originalContext : Object = action.context
+
     while (++i < l) {
+      const context = {...originalContext}
+
+      if (result[i].regex) {
+        const item = result[i]
+        const matches = strPath.match(item.regex)
+
+        matches.shift()
+
+        let j : number = -1
+        const keys = item.keys
+        const l2 : number = keys.length
+
+        while (++j < l2) {
+          context[keys[i]] = matches.shift()
+        }
+      }
+
+      action.context = context
+
       state = result[i].Reduce(action, state, payload)
     }
+
+    action.context = originalContext
 
     return state
   }

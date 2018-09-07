@@ -442,6 +442,7 @@ function Update (steps: Array, action: Action) : Hermes {
         }
       }
 
+      context.$$path = strPath
       action.context = context
 
       state = result[i].Reduce(action, state, payload)

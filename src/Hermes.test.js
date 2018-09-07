@@ -640,4 +640,33 @@ describe('#Hermes', () => {
       }
     })
   })
+  
+  test('Should surface up context information to all called reducers', (done : Function) => {
+    class ParentReducer extends Reducer {
+      Reduce (action : Action, state : state, payload : payload) {
+        if (action.name === '__init__') {
+          return
+        }
+
+        expect(action.context).toHaveProperty('$$path')
+        expect(action.context.$$path).toStrictEqual('test/0')
+        expect(action.context).toHaveProperty('key')
+        expect(action.context.key).toStrictEqual('0')
+
+        done()
+      }
+    }
+
+    const parentReducer : ParentReducer = new ParentReducer
+    const testReducer : TestReducer = new TestReducer
+
+    const store = new Hermes({
+      reducers : {
+        'test/:key' : parentReducer,
+        'test/:key/test' : testReducer
+      }
+    })
+
+    store.Do(testReducer.Change({test : 'test2'}), 'test/0')
+  })
 })

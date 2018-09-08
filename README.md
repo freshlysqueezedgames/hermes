@@ -122,6 +122,7 @@ const store : Hermes = new Hermes({
 5. Returned event state is the culmination of all matching reducers for an action path, regardless of when they are triggered
 6. You Subscribe to events, not actions
 7. You can declare as many events as you like inside your reducers
+8. Hermes is child-first. Meaning it will reduce at the bottom-most nodes and then iterate up their path back towards the root.
 
 ## Hermes Class
 
@@ -459,6 +460,48 @@ const store : Hermes = new Hermes({
 
 ```
 In this case, if specific is specified in an action, both are called, in the order they are originally declared. This may help further in specifically applying behaviours without having to repeat your code.
+
+### Understanding Context
+
+Context delivered to reducers contains all the keys defined in your action dispatch path and reducer paths. It is designed to give you full information on precisely along what likes the action has been invoked.
+
+It also comes with a special $$path variable that defines the location at which the action is being triggered.
+
+Say you have a reducer at path:
+
+```
+one/:two/three
+```
+
+and an action is dispatch to the path:
+
+```
+one/two/:three
+```
+
+with a context of 
+
+```javascript
+
+const context: Object = {
+  three : 'something'
+}
+```
+
+The action would get invoked with a context of: 
+
+```javacript
+
+const context : Object = {
+  $$path : 'one/two/something',
+  two : 'two',
+  three : 'something'
+}
+```
+### Parenting
+
+Parent objects of the target action location will also recieve the action with full context, this means you can enforce further changes up the heap with full knowledge of where precisely this happens.
+This is useful in situations where an action may require more behaviour at different parts of your tree.
 
 ## Actions
 

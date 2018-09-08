@@ -441,6 +441,8 @@ describe('#Hermes', () => {
     const testReducer : TestReducer = new TestReducer
     const childReducer : TestReducer = new TestReducer
 
+    console.log('starting to make sense')
+
     const store = new Hermes({
       reducers : {
         'parent' : testReducer,
@@ -464,6 +466,8 @@ describe('#Hermes', () => {
     store.Subscribe(TestReducer.EVENTS.CHANGE, mock, 'parent/child')
 
     store.Do(childReducer.Change({test2 : 'test2'}))
+
+    console.log('starting to make sense')
   })
 
   test('Should preserve original values from the state for arrays', (done : Function) => {
@@ -672,5 +676,39 @@ describe('#Hermes', () => {
     })
 
     store.Do(testReducer.Change({test : 'test2'}), 'test/0')
+  })
+
+  test('Should always give context of matching leaf reducer', (done : Function) => {
+    console.log('we have started it!')
+
+    class ParentReducer extends Reducer {
+      Reduce (action : Action, state : state, payload : payload) {
+        if (action.name === '__init__') {
+          return
+        }
+
+        console.log('Annnnnddddd', action)
+
+        expect(action.context).toMatchObject({
+          $$path : 'test/0/test/bla',
+          key : '0',
+          something : 'bla'
+        })
+
+        done()
+      }
+    }
+
+    const parentReducer : ParentReducer = new ParentReducer
+    const testReducer : TestReducer = new TestReducer
+
+    const store = new Hermes({
+      reducers : {
+        'test/:key' : parentReducer,
+        'test/:key/test/:something' : testReducer
+      }
+    })
+
+    store.Do(testReducer.Change({test : 'test2'}), 'test/0/test/bla')
   })
 })

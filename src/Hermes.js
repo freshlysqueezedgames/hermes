@@ -93,16 +93,18 @@ export default class Hermes {
           // Bind a function for accessing the events list. There is one list per Hermes.
           targetReducer.hermes = t
 
-          const current: Object = Branch.call(t, t.reducerHeap, key.split('/'), (node : Object = Object.create(null), step : string, i : number) => {
+          Branch(t.reducerHeap, key.split('/'), (node : Object = Object.create(null), step : string, i : number) => {
             node.step = step
             node.position = i + 1
 
             return node
-          }, true)
+          }, true, (current : Object) => {
+            t.reducerEnds.push(current)
 
-          t.reducerEnds.push(current)
+            current.reducer = targetReducer
 
-          current.reducer = targetReducer
+            return current
+          })
 
           targetReducer.path = key
           targetReducer.keys = []
@@ -374,8 +376,8 @@ async function Query (path: string, action: Action): Promise {
   try { // we want to launch a new promise, which 
     let state : Object
     
-    Branch.call(t, t.store, steps, (node : Object) => {
-      return (state = node || Object.create(null))
+    Branch(t.store, steps, undefined, false, (node : Object) => {
+      state = node || Object.create()
     })
 
     const result : Object = await new Promise ((resolve : Function, reject : Function) => {
@@ -401,6 +403,8 @@ async function Query (path: string, action: Action): Promise {
  */
 function Update (steps: Array, action: Action, originalPath : string) : Hermes {
   const t: Hermes = this
+  
+  let needsContext = true
 
   function OnStep (node : Object, path : Array, payload : Object) {
     const strPath : string = path.join('/')
@@ -419,67 +423,65 @@ function Update (steps: Array, action: Action, originalPath : string) : Hermes {
       return state
     })
 
-    let i : number = -1
-    const l : number = result.length
-
-    const originalContext : Object = action.context
-
     if (t.verbose) {
-      console.log('action has an original context of', originalContext)
       console.log('the reducers to be called are', result)
     }
 
-    while (++i < l) {
-      const context = {...originalContext}
+    let i : number = -1
+    const l : number = result.length
 
-      if (result[i].regex) {
-        const item = result[i]
-        const matches = strPath.match(item.regex)
+    if (needsContext) {
+      const context = action.context
 
-        matches.shift()
+      while (++i < l) {
+        if (result[i].regex) {
+          const item = result[i]
+          const matches = strPath.match(item.regex)
 
-        let j : number = -1
-        const keys = item.keys
-        const l2 : number = keys.length
+          matches.shift()
 
-        while (++j < l2) {
-          context[keys[i]] = matches.shift()
+          let j : number = -1
+          const keys = item.keys
+          const l2 : number = keys.length
+
+          while (++j < l2) {
+            context[keys[j]] = matches.shift()
+          }
         }
       }
 
       context.$$path = originalPath
-      action.context = context
-
-      if (t.verbose) {
-        console.log('Reducer called with', result[i], action, state, payload)
-      }
-
-      state = result[i].Reduce(action, state, payload)
     }
 
-    action.context = originalContext
+    needsContext = false
+
+    i = -1
+
+    while (++i < l) {
+      state = result[i].Reduce(action, state, payload)
+    }
 
     return state
   }
 
+  function OnAppend (store : Object | Array) {
+    // then the returned heap needs to be updated (tree structure, no longer branch path)
+    // payloads exist because we are now in the returned object heap. 
+    return Tree(store, action.payload, (node : Object, payload : Object, keys : Array) : Object => {
+      return OnStep(node, [...steps, ...keys], payload)
+    }, t.reducerHeap)
+  }
+
   // we need to update the branch for the store where the path is concerned
   // no payload as this is just a path update
-  const store: Object = Branch.call(t, t.store, steps, (node : Object, step : string, i : number) : Object => {
+  Branch(t.store, steps, (node : Object, step : string, i : number) : Object => {
     return OnStep(node, steps.slice(0, i + 1), i === steps.length - 1 ? action.payload : undefined)
-  })
-
-  // then the returned heap needs to be updated (tree structure, no longer branch path)
-  // payloads exist because we are now in the returned object heap. 
-  Tree.call(t, store, action.payload, (node : Object, payload : Object, keys : Array) : Object => {
-    return OnStep(node, [...steps, ...keys], payload)
-  }, t.reducerHeap)
+  }, false, OnAppend)
 
   return t
 }
 
 function Tree (target: Object, heap: Object | Array, onNode?: callback, keys: Array = []) : Object {
-  const t : Hermes = this
-
   if (toString.call(heap) === ARRAY) {
     let i : number = -1
     let member : any
@@ -491,7 +493,7 @@ function Tree (target: Object, heap: Object | Array, onNode?: callback, keys: Ar
 
       const childKeys : Array = [...keys, i]
 
-      target[i] = Tree.call(t, target[i] || (toString.call(member) === ARRAY ? new Array(member.length) : Object.create(null)), member, onNode, childKeys)
+      target[i] = Tree(target[i] || (toString.call(member) === ARRAY ? new Array(member.length) : Object.create(null)), member, onNode, childKeys)
       target[i] = onNode(target[i], member, childKeys)
     }
 
@@ -505,7 +507,7 @@ function Tree (target: Object, heap: Object | Array, onNode?: callback, keys: Ar
     if (typeString === OBJECT || typeString === ARRAY) {
       const childKeys: Array = [...keys, key]
 
-      target[key] = Tree.call(t, target[key] || (typeString === ARRAY ? new Array(node.length) : Object.create(null)), node, onNode, childKeys)
+      target[key] = Tree(target[key] || (typeString === ARRAY ? new Array(node.length) : Object.create(null)), node, onNode, childKeys)
       target[key] = onNode(target[key], node, childKeys)
     }
   }
@@ -513,46 +515,28 @@ function Tree (target: Object, heap: Object | Array, onNode?: callback, keys: Ar
   return target
 }
 
-function Branch (target: Object, steps: Array, onNode?: callback = OnNode, parenting: boolean = false): Object {
-  const t : Hermes = this
+function Branch (target: Object, steps: Array, onNode?: callback = OnNode, parenting: boolean = false, onAppend? : Function, i : number = 0): Object {
+  const step: string = steps[i]
 
-  // our store needs to be updated with the values
-  let i: number = -1
-  const l: number = steps.length
-
-  onNode = onNode || OnNode
-
-  let last
-
-  function Iterator (target? : Object, i : number = 0) {
-    const step: string = steps[i]
-
-    if (!step) {
-      return Iterator(target, i + 1)
-    }
-
-    target[step] = target[step] || Object.create(null)
-
-    if (i + 1 < l) {
-      target[step] = Iterator(target[step], i + 1)
-    } 
-
-    target[step] = onNode(target[step], step, i)
-
-    if (parenting) {
-      target[step].parent = target
-    }
-
-    if (i + 1 >= l) {
-      last = target[step]
-    }
-
-    return target
+  if (!step) {
+    return Branch(target, steps, onNode, parenting, onAppend, i + 1)
   }
 
-  Iterator(target)
+  target[step] = target[step] || Object.create(null)
 
-  return last
+  if (i + 1 < steps.length) {
+    target[step] = Branch(target[step], steps, onNode, parenting, onAppend, i + 1)
+  } else if (onAppend) {
+    target[step] = onAppend(target[step])
+  }
+
+  target[step] = onNode(target[step], step, i)
+
+  if (parenting) {
+    target[step].parent = target
+  }
+
+  return target
 }
 
 function OnNode (node: Object) { // stops inline creation of objects in branch

@@ -333,7 +333,7 @@ async function Query (path: string, action: Action): Promise {
     action.payload = payload // Override the payload with the new one given
 
     // Update the store, and ensure that the new state is in place.
-    Update.call(t, steps, action)
+    Update.call(t, steps, action, path)
 
     // This part, working in parent-first left-to-right, we should trigger any subscribers at each path within the CHANGED heap.
     //Publish.call(t, steps, action)
@@ -399,7 +399,7 @@ async function Query (path: string, action: Action): Promise {
  * @param {Action} action: The action to perform on the heap
  * @return {Hermes}
  */
-function Update (steps: Array, action: Action) : Hermes {
+function Update (steps: Array, action: Action, originalPath : string) : Hermes {
   const t: Hermes = this
 
   function OnStep (node : Object, path : Array, payload : Object) {
@@ -424,6 +424,11 @@ function Update (steps: Array, action: Action) : Hermes {
 
     const originalContext : Object = action.context
 
+    if (t.verbose) {
+      console.log('action has an original context of', originalContext)
+      console.log('the reducers to be called are', result)
+    }
+
     while (++i < l) {
       const context = {...originalContext}
 
@@ -442,8 +447,12 @@ function Update (steps: Array, action: Action) : Hermes {
         }
       }
 
-      context.$$path = strPath
+      context.$$path = originalPath
       action.context = context
+
+      if (t.verbose) {
+        console.log('Reducer called with', result[i], action, state, payload)
+      }
 
       state = result[i].Reduce(action, state, payload)
     }
@@ -504,7 +513,7 @@ function Tree (target: Object, heap: Object | Array, onNode?: callback, keys: Ar
   return target
 }
 
-function Branch (target: Object, steps: Array, onNode?: callback, parenting: boolean = false): Object {
+function Branch (target: Object, steps: Array, onNode?: callback = OnNode, parenting: boolean = false): Object {
   const t : Hermes = this
 
   // our store needs to be updated with the values
@@ -513,12 +522,20 @@ function Branch (target: Object, steps: Array, onNode?: callback, parenting: boo
 
   onNode = onNode || OnNode
 
-  while (++i < l) {
+  let last
+
+  function Iterator (target? : Object, i : number = 0) {
     const step: string = steps[i]
 
     if (!step) {
-      continue
+      return Iterator(target, i + 1)
     }
+
+    target[step] = target[step] || Object.create(null)
+
+    if (i + 1 < l) {
+      target[step] = Iterator(target[step], i + 1)
+    } 
 
     target[step] = onNode(target[step], step, i)
 
@@ -526,10 +543,16 @@ function Branch (target: Object, steps: Array, onNode?: callback, parenting: boo
       target[step].parent = target
     }
 
-    target = target[step]
+    if (i + 1 >= l) {
+      last = target[step]
+    }
+
+    return target
   }
 
-  return target
+  Iterator(target)
+
+  return last
 }
 
 function OnNode (node: Object) { // stops inline creation of objects in branch

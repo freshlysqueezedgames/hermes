@@ -610,6 +610,8 @@ describe('#Hermes', () => {
   })
 
   test('Should adapt to changes in state structure at a nested level', () => {
+    console.log('I am starting!')
+
     const testReducer : TestReducer = new TestReducer
 
     const store = new Hermes({})
@@ -639,6 +641,8 @@ describe('#Hermes', () => {
         ]
       }
     })
+
+    console.log('I am done!')
   })
   
   test('Should surface up context information to all called reducers', (done : Function) => {

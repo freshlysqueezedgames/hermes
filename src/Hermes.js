@@ -380,11 +380,7 @@ async function Query (path: string, action: Action): Promise {
   try { // we want to launch a new promise, which 
     let state : Object
 
-    console.log('looking at this path!', t.store, steps)
-    
     Branch(t.store, steps, undefined, false, (node : Object) => {
-      console.log('state is alright!', node)
-      
       return (state = node || Object.create())
     })
 

@@ -38,7 +38,6 @@ export default class Reducer {
     // Because children can update, you must update only your layer of influence.
     // In lamence terms, only update the state with the root layer of values... I think... this I guess depends on whether a custom child mutation has happened?
     // The default reducer will apply to children... so I guess there will be updates there too...
-
     if (stateType !== payloadType) {
       return payloadType === ARRAY ? [...payload] : {...payload}
     }
@@ -67,6 +66,7 @@ export default class Reducer {
     const l : number = keys.length
 
     while (++i < l) {
+      const key = keys[i]
       const item : any = state[key]
 
       if (typeof item === 'object') {

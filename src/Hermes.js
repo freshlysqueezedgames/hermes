@@ -334,6 +334,10 @@ async function Query (path: string, action: Action): Promise {
   const OnApply: Function = (payload: Object = Object.create(null)) => {
     action.payload = payload // Override the payload with the new one given
 
+    if (t.verbose) {
+      console.log('Updating with this action payload', action, t.store)
+    }
+
     // Update the store, and ensure that the new state is in place.
     Update.call(t, steps, action, path)
 
@@ -375,9 +379,13 @@ async function Query (path: string, action: Action): Promise {
 
   try { // we want to launch a new promise, which 
     let state : Object
+
+    console.log('looking at this path!', t.store, steps)
     
     Branch(t.store, steps, undefined, false, (node : Object) => {
-      state = node || Object.create()
+      console.log('state is alright!', node)
+      
+      return (state = node || Object.create())
     })
 
     const result : Object = await new Promise ((resolve : Function, reject : Function) => {
@@ -385,6 +393,10 @@ async function Query (path: string, action: Action): Promise {
         resolve(action.payload)
       }
     })
+
+    if (t.verbose) {
+      console.log('Request result!', result)
+    }
 
     OnApply(result)
   } catch (error) {
@@ -406,7 +418,7 @@ function Update (steps: Array, action: Action, originalPath : string) : Hermes {
   
   let needsContext = true
 
-  function OnStep (node : Object, path : Array, payload : Object) {
+  function OnStep (node : Object, path : Array, payload : Object, test : boolean = false) {
     const strPath : string = path.join('/')
     const result = MatchingReducers.call(t, strPath) || [t.reducer] // look for an exact path match in the reducers
 
@@ -417,11 +429,9 @@ function Update (steps: Array, action: Action, originalPath : string) : Hermes {
       state = result[0].Reduce(new Action('__init__'))
       // remove events created as a result.
       t.ignoreEvents = false
-    }
 
-    SetContext.call(t, strPath, action.context, function () {
       return state
-    })
+    }
 
     if (t.verbose) {
       console.log('the reducers to be called are', result)
@@ -454,6 +464,10 @@ function Update (steps: Array, action: Action, originalPath : string) : Hermes {
     }
 
     needsContext = false
+
+    SetContext.call(t, strPath, action.context, function () {
+      return state
+    })
 
     i = -1
 
@@ -522,7 +536,7 @@ function Branch (target: Object, steps: Array, onNode?: callback = OnNode, paren
     return Branch(target, steps, onNode, parenting, onAppend, i + 1)
   }
 
-  target[step] = target[step] || Object.create(null)
+  target[step] = target[step] || (toString.call(onNode(target[step], step, i, true)) === ARRAY ? [] : Object.create(null))
 
   if (i + 1 < steps.length) {
     target[step] = Branch(target[step], steps, onNode, parenting, onAppend, i + 1)

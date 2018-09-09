@@ -441,7 +441,7 @@ function Update (steps: Array, action: Action, originalPath : string) : Hermes {
           matches.shift()
 
           let j : number = -1
-          const keys = item.keys
+          const keys : Array = item.keys
           const l2 : number = keys.length
 
           while (++j < l2) {

@@ -1,7 +1,8 @@
 import Action from './Action'
 
 const {toString} = Object.prototype
-const ARRAY = '[object Array]' 
+const ARRAY : string = '[object Array]' 
+const OBJECT : string = '[object Object]'
 
 export default class Reducer {
   static EVENTS : Object = {
@@ -26,8 +27,54 @@ export default class Reducer {
    * @param {*} state 
    * @param {*} payload
    */
-  Reduce (action : Action, state : Object | Array = Object.create(null), payload : Array | Object = Object.create(null)) : Object | Array {
-    return toString.call(state) === ARRAY ? [...payload] : {...state, ...payload}
+  Reduce (action : Action, state : Object | Array = Object.create(null), payload? : Array | Object) : Object | Array {
+    if (!payload) {
+      return state
+    }
+
+    const stateType = toString.call(state)
+    const payloadType = toString.call(payload)
+
+    // Because children can update, you must update only your layer of influence.
+    // In lamence terms, only update the state with the root layer of values... I think... this I guess depends on whether a custom child mutation has happened?
+    // The default reducer will apply to children... so I guess there will be updates there too...
+    if (stateType !== payloadType) {
+      return payloadType === ARRAY ? [...payload] : {...payload}
+    }
+
+    if (stateType === ARRAY) {
+      const newState : Array = new Array(payload.length)
+      let i : number = payload.length
+      
+      while (i--) {
+        const item : any = state[i]
+
+        if (typeof item === 'object') {
+          newState[i] = item || payload[i]
+        } else {
+          newState[i] = payload[i]
+        }
+      }
+
+      return newState
+    }
+
+    const newState : Object = {...state, ...payload}
+    const keys : Array = Object.keys(state)
+
+    let i : number = -1
+    const l : number = keys.length
+
+    while (++i < l) {
+      const key = keys[i]
+      const item : any = state[key]
+
+      if (typeof item === 'object') {
+        newState[key] = item
+      }
+    }
+
+    return newState
   }
 
   /**

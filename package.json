@@ -1,6 +1,6 @@
 {
   "name": "@freshlysqueezedgames/hermes",
-  "version": "0.3.2",
+  "version": "0.5.4",
   "description": "independant state management pipeline",
   "main": "dist/index.js",
   "scripts": {
@@ -17,7 +17,17 @@
   "keywords": [
     "Flux",
     "State",
-    "Store"
+    "Store",
+    "Regex",
+    "Paths",
+    "Reducers",
+    "State Container",
+    "Predictable State Container",
+    "Data Management",
+    "Single Page Applications",
+    "SPA",
+    "Unidirectional Data Flow",
+    "Flow"
   ],
   "author": "Carl Pryke (Freshly Squeezed Games LTD)",
   "license": "MIT",

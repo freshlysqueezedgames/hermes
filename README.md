@@ -123,6 +123,7 @@ const store : Hermes = new Hermes({
 6. You Subscribe to events, not actions
 7. You can declare as many events as you like inside your reducers
 8. Hermes is child-first. Meaning it will reduce at the bottom-most nodes and then iterate up their path back towards the root.
+9. Actions are executed in the order they are submitted, and are asynchronous.
 
 ## Hermes Class
 

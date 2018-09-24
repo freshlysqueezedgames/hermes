@@ -422,8 +422,6 @@ async function Query (path: string, action: Action): Promise {
  */
 function Update (steps: Array, action: Action, originalPath : string) : Hermes {
   const t: Hermes = this
-  
-  let needsContext = true
 
   function OnStep (node : Object, path : Array, payload : Object, test : boolean = false) {
     const strPath : string = path.join('/')
@@ -469,8 +467,6 @@ function Update (steps: Array, action: Action, originalPath : string) : Hermes {
 
       context.$$path = originalPath
     }
-
-    needsContext = false
 
     SetContext.call(t, strPath, action.context, function () {
       return state

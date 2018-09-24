@@ -882,92 +882,54 @@ describe('#Hermes', () => {
     store.Do(childReducer.Change({test : 'test'}), 'test/0/test/bla')
   })
 
-  // test('Should return indexes regardless of dispatching reducer', (done : Function) => {
-  //   let callcount = 0
+  test('Should return indexes regardless of dispatching reducer', (done : Function) => {
+    const testReducer = new TestReducer
 
-  //   class ParentReducer extends Reducer {
-  //     Reduce (action : Action, state : state, payload : payload) {
-  //       if (action.name === '__init__') {
-  //         return state
-  //       }
+    const hermes : Hermes = new Hermes({
+      reducers : {
+        'test/:key' : new TestReducer
+      }
+    })
 
-  //       expect(action.context).toMatchObject({
-  //         $$path : 'test/0/test/bla',
-  //         key : '0',
-  //         something : 'bla'
-  //       })
+    hermes.Subscribe(TestReducer.EVENTS.CHANGE, (event : Object) => {
+      expect(event.context).toMatchObject({
+        $$path : 'test/0',
+        key : '0'
+      })
 
-  //       switch (action.name) {
-  //         case TestReducer.ACTIONS.CHANGE : {
-  //           if (!callcount++) {
-  //             return {...state, test2 : 'test2'}
-  //           }
+      done()
+    })
 
-  //           return {...state}
-  //         }
-  //       }
-  //     }
-  //   }
+    hermes.Do(testReducer.Change({test : 'test'}), 'test/0')
+  })
 
-  //   class ChildReducer extends TestReducer {
-  //     Reduce (action : Action, state : state, payload : payload) {
-  //       if (action.name === '__init__') {
-  //         return state
-  //       }
+  test('Should return indexes regardless of dispatching reducer level', (done : Function) => {
+    const testReducer = new TestReducer
 
-  //       expect(action.context).toMatchObject({
-  //         $$path : 'test/0/test/bla',
-  //         key : '0',
-  //         something : 'bla'
-  //       })
+    const hermes : Hermes = new Hermes({
+      reducers : {
+        'test': new TestReducer,
+        'test/:key' : new TestReducer
+      }
+    })
 
-  //       this.Dispatch(TestReducer.EVENTS.CHANGE)
+    function Test (finished : boolean = false) {
+      hermes.Subscribe(TestReducer.EVENTS.CHANGE, (event : Object) => {
+        expect(event.context).toMatchObject({
+          $$path : 'test/0',
+          key : '0'
+        })
+      }, 'test')
 
-  //       return {...state, ...payload}
-  //     }
-  //   }
+      hermes.Do(testReducer.Change({test : 'test'}), 'test/0')
 
-  //   const parentReducer : ParentReducer = new ParentReducer
-  //   const childReducer : ChildReducer = new ChildReducer
+      if (finished) {
+        done()
+      } else {
+        Test(true)
+      }
+    }
 
-  //   const store = new Hermes({
-  //     reducers : {
-  //       'test/:key' : parentReducer,
-  //       'test/:key/test/:something' : childReducer
-  //     },
-  //     remote : {
-  //       paths : [
-  //         'test/:key/test/:something'
-  //       ],
-  //       request (path : string, action : Hermes.Action, state : Object, resolve : Function) {
-  //         expect(path).toStrictEqual('test/:key/test/:something')
-  //         resolve({
-  //           test3 : 'test3'
-  //         })
-  //       }
-  //     }
-  //   })
-
-  //   store.Subscribe(TestReducer.ACTIONS.CHANGE, () => {
-  //     expect(store.GetState()).toMatchObject({
-  //       test : {
-  //         "0" : {
-  //           test : {
-  //             bla : {
-  //               test : 'test',
-  //               test3: 'test3'
-  //             }
-  //           },
-  //           test2 : 'test2'
-  //         }
-  //       }
-  //     })
-
-  //     done()
-
-  //     return true
-  //   })
-
-  //   store.Do(childReducer.Change({test : 'test'}), 'test/0/test/bla')
-  // })
+    Test()
+  })
 })

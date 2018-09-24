@@ -444,29 +444,26 @@ function Update (steps: Array, action: Action, originalPath : string) : Hermes {
 
     let i : number = -1
     const l : number = result.length
+    const context : Object = action.context
 
-    if (needsContext) {
-      const context = action.context
+    while (++i < l) {
+      if (result[i].regex) {
+        const item : Object = result[i]
+        const matches : Array = strPath.match(item.regex)
 
-      while (++i < l) {
-        if (result[i].regex) {
-          const item = result[i]
-          const matches = strPath.match(item.regex)
+        matches.shift()
 
-          matches.shift()
+        let j : number = -1
+        const keys : Array = item.keys
+        const l2 : number = keys.length
 
-          let j : number = -1
-          const keys : Array = item.keys
-          const l2 : number = keys.length
-
-          while (++j < l2) {
-            context[keys[j]] = matches.shift()
-          }
+        while (++j < l2) {
+          context[keys[j]] = matches.shift()
         }
       }
-
-      context.$$path = originalPath
     }
+
+    context.$$path = originalPath
 
     SetContext.call(t, strPath, action.context, function () {
       return state

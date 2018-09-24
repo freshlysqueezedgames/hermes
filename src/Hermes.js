@@ -189,8 +189,15 @@ export default class Hermes {
     if (!(action instanceof Action)) {
       throw new Error('Parameter 1 must be an Action instance', action)
     }
+
+    if (t.current) {
+      return (t.current = t.current.then(() : Promise => t.Do(action, path)))
+    }
+
     // one time call for the first request of the data
-    return Query.call(t, pathToRegexp.compile(path || action.Reducer().path)(action.context), action)
+    return (t.current = Query.call(t, pathToRegexp.compile(path || action.Reducer().path)(action.context), action).then(() => {
+      t.current = null
+    }))
   }
 
   /**
@@ -226,10 +233,13 @@ export default class Hermes {
 
 function Dispatch () {
   const t : Hermes = this
-  let i : number = -1
-  let event : Object
 
-  while ((event = t.events[++i])) {
+  let i : number = -1
+  const l : number = t.events.length
+
+  while (++i < l) {
+    const event : Object = t.events[i]
+
     if (!t.callbacks[event.name]) {
       continue
     }
@@ -237,9 +247,10 @@ function Dispatch () {
     const list : Array = t.callbacks[event.name]
 
     let j : number = -1
-    let callback
+    let l2 : number = list.length
 
-    while ((callback = list[++j])) {
+    while (++j < l2) {
+      const callback : Function = list[j]
       let result : Array
 
       if (callback.regex && !(result = callback.regex.exec(event.path))) {
@@ -268,6 +279,7 @@ function Dispatch () {
 
       if (callback(content)) {
         list.splice(j--, 1)
+        l2--
       }
     }
   }
@@ -377,27 +389,26 @@ async function Query (path: string, action: Action): Promise {
     return
   }
 
-  try { // we want to launch a new promise, which 
-    let state : Object
+  let state : Object
 
-    Branch(t.store, steps, undefined, false, (node : Object) => {
-      return (state = node || Object.create())
-    })
+  Branch(t.store, steps, undefined, false, (node : Object) => {
+    return (state = node || Object.create())
+  })
 
+  try {
     const result : Object = await new Promise ((resolve : Function, reject : Function) => {
       if(t.remote.request(requestPath, action, state, (payload : Object) => resolve && resolve({...action.payload, ...payload})) === false) {
         resolve(action.payload)
       }
     })
-
+  
     if (t.verbose) {
       console.log('Request result!', result)
     }
 
     OnApply(result)
   } catch (error) {
-    console.warn('Request failed in the network', error)
-    OnApply({error : 'Request Failed'})
+    throw new Error(error)
   }
 }
 

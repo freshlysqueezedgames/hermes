@@ -574,7 +574,7 @@ describe('#Hermes', () => {
     expect(mock).toHaveBeenCalledTimes(3)
   })
 
-  test('Should adapt to changes in state structure', () => {
+  test('Should adapt to changes in state structure', async () => {
     const testReducer : TestReducer = new TestReducer
 
     const store = new Hermes({})
@@ -591,7 +591,7 @@ describe('#Hermes', () => {
       }
     })
 
-    store.Do(new Action('test.change', ['test1']), 'test')
+    await store.Do(new Action('test.change', ['test1']), 'test')
 
     state = store.GetState()
 
@@ -601,7 +601,7 @@ describe('#Hermes', () => {
       ]
     })
 
-    store.Do(new Action('test.change', {test : 'test'}), 'test')
+    await store.Do(new Action('test.change', {test : 'test'}), 'test')
 
     state = store.GetState()
 
@@ -612,14 +612,14 @@ describe('#Hermes', () => {
     })
   })
 
-  test('Should adapt to changes in state structure at a nested level', () => {
+  test('Should adapt to changes in state structure at a nested level', async () => {
     const testReducer : TestReducer = new TestReducer
 
     const store = new Hermes({})
 
     const mock : Jest.Mock = jest.fn()
 
-    store.Do(new Action('test.change', {test : {test : 'test'}}), 'test')
+    await store.Do(new Action('test.change', {test : {test : 'test'}}), 'test')
     
     let state : Object = store.GetState()
 
@@ -631,7 +631,7 @@ describe('#Hermes', () => {
       }
     })
 
-    store.Do(new Action('test.change', ['test1']), 'test/test')
+    await store.Do(new Action('test.change', ['test1']), 'test/test')
 
     state = store.GetState()
 
@@ -673,7 +673,7 @@ describe('#Hermes', () => {
     store.Do(testReducer.Change({test : 'test2'}), 'test/0')
   })
 
-  test('Should always give context of matching leaf reducer', () => {
+  test('Should always give context of matching leaf reducer', async () => {
     let callcount = 0
 
     class ParentReducer extends Reducer {
@@ -726,7 +726,7 @@ describe('#Hermes', () => {
       }
     })
 
-    store.Do(childReducer.Change({test : 'test'}), 'test/0/test/bla')
+    await store.Do(childReducer.Change({test : 'test'}), 'test/0/test/bla')
 
     const state = store.GetState()
 
@@ -743,7 +743,7 @@ describe('#Hermes', () => {
       }
     })
 
-    store.Do(childReducer.Change({test2 : 'test2'}), 'test/0/test/bla')
+    await store.Do(childReducer.Change({test2 : 'test2'}), 'test/0/test/bla')
 
     expect(store.GetState()).toMatchObject({
       test : {
@@ -760,8 +760,38 @@ describe('#Hermes', () => {
     })
   })
 
-  test('Should correctly return state when performing remote requests', () => {
-    let callcount = 0
+  test('Should correctly return state when performing remote requests', (done : Function) => {
+    let count = 0
+
+    class ChildReducer extends Reducer {
+      static ACTIONS : Object = {
+        CHANGE : 'childreducer.change'
+      }
+
+      static EVENTS : Object = {
+        CHANGE : 'childreducer.change'
+      }
+
+      Reduce (action : Action, state : state = Object.create(null), payload : payload) {
+        if (action.name === '__init__') {
+          return state
+        }
+
+        expect(action.context).toMatchObject({
+          $$path : 'test/0/test/bla',
+          key : '0',
+          something : 'bla'
+        })
+
+        this.Dispatch(ChildReducer.EVENTS.CHANGE)
+
+        return {...state, ...payload}
+      }
+
+      Change (payload : Object) {
+        return this.Action(ChildReducer.ACTIONS.CHANGE, payload)
+      }
+    }
 
     class ParentReducer extends Reducer {
       Reduce (action : Action, state : state, payload : payload) {
@@ -776,30 +806,14 @@ describe('#Hermes', () => {
         })
 
         switch (action.name) {
-          case TestReducer.ACTIONS.CHANGE : {
-            if (!callcount++) {
+          case ChildReducer.ACTIONS.CHANGE : {
+            if (!count++) {
               return {...state, test2 : 'test2'}
             }
 
-            return {...state}
+            return state
           }
         }
-      }
-    }
-
-    class ChildReducer extends TestReducer {
-      Reduce (action : Action, state : state, payload : payload) {
-        if (action.name === '__init__') {
-          return state
-        }
-
-        expect(action.context).toMatchObject({
-          $$path : 'test/0/test/bla',
-          key : '0',
-          something : 'bla'
-        })
-
-        return {...state, ...payload}
       }
     }
 
@@ -824,7 +838,7 @@ describe('#Hermes', () => {
       }
     })
 
-    store.Subscribe(ChildReducer.ACTIONS.CHANGE, () => {
+    store.Subscribe(ChildReducer.EVENTS.CHANGE, () => {
       expect(store.GetState()).toMatchObject({
         test : {
           "0" : {
@@ -839,30 +853,121 @@ describe('#Hermes', () => {
         }
       })
 
+      store.Subscribe(ChildReducer.EVENTS.CHANGE, (event) => {
+        expect(store.GetState()).toMatchObject({
+          test : {
+            '0' : {
+              test : {
+                bla : {
+                  test : 'test',
+                  test3 : 'test3',
+                  test2 : 'test2'
+                }
+              },
+              test2 : 'test2'
+            }
+          }
+        })
+
+        done()
+
+        return true
+      })
+
+      store.Do(childReducer.Change({test2 : 'test2'}), 'test/0/test/bla')
+
       return true
     })
 
     store.Do(childReducer.Change({test : 'test'}), 'test/0/test/bla')
-
-    store.Subscribe(ChildReducer.ACTIONS.CHANGE, () => {
-      expect(store.GetState()).toMatchObject({
-        test : {
-          '0' : {
-            test : {
-              bla : {
-                test : 'test',
-                test2 : 'test2',
-                test3 : 'test3'
-              }
-            },
-            test2 : 'test2'
-          }
-        }
-      })
-
-      return true
-    })
-
-    store.Do(childReducer.Change({test2 : 'test2'}), 'test/0/test/bla')
   })
+
+  // test('Should return indexes regardless of dispatching reducer', (done : Function) => {
+  //   let callcount = 0
+
+  //   class ParentReducer extends Reducer {
+  //     Reduce (action : Action, state : state, payload : payload) {
+  //       if (action.name === '__init__') {
+  //         return state
+  //       }
+
+  //       expect(action.context).toMatchObject({
+  //         $$path : 'test/0/test/bla',
+  //         key : '0',
+  //         something : 'bla'
+  //       })
+
+  //       switch (action.name) {
+  //         case TestReducer.ACTIONS.CHANGE : {
+  //           if (!callcount++) {
+  //             return {...state, test2 : 'test2'}
+  //           }
+
+  //           return {...state}
+  //         }
+  //       }
+  //     }
+  //   }
+
+  //   class ChildReducer extends TestReducer {
+  //     Reduce (action : Action, state : state, payload : payload) {
+  //       if (action.name === '__init__') {
+  //         return state
+  //       }
+
+  //       expect(action.context).toMatchObject({
+  //         $$path : 'test/0/test/bla',
+  //         key : '0',
+  //         something : 'bla'
+  //       })
+
+  //       this.Dispatch(TestReducer.EVENTS.CHANGE)
+
+  //       return {...state, ...payload}
+  //     }
+  //   }
+
+  //   const parentReducer : ParentReducer = new ParentReducer
+  //   const childReducer : ChildReducer = new ChildReducer
+
+  //   const store = new Hermes({
+  //     reducers : {
+  //       'test/:key' : parentReducer,
+  //       'test/:key/test/:something' : childReducer
+  //     },
+  //     remote : {
+  //       paths : [
+  //         'test/:key/test/:something'
+  //       ],
+  //       request (path : string, action : Hermes.Action, state : Object, resolve : Function) {
+  //         expect(path).toStrictEqual('test/:key/test/:something')
+  //         resolve({
+  //           test3 : 'test3'
+  //         })
+  //       }
+  //     }
+  //   })
+
+  //   store.Subscribe(TestReducer.ACTIONS.CHANGE, () => {
+  //     expect(store.GetState()).toMatchObject({
+  //       test : {
+  //         "0" : {
+  //           test : {
+  //             bla : {
+  //               test : 'test',
+  //               test3: 'test3'
+  //             }
+  //           },
+  //           test2 : 'test2'
+  //         }
+  //       }
+  //     })
+
+  //     done()
+
+  //     return true
+  //   })
+
+  //   store.Do(childReducer.Change({test : 'test'}), 'test/0/test/bla')
+  // })
 })

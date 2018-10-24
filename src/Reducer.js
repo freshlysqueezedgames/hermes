@@ -97,8 +97,7 @@ export default class Reducer {
   /**
    * @name Dispatch
    * @description Adds events to a list of events that gets triggered once the store has fully updated.
-   * @param {String} eventName 
-   * @param {Object} data 
+   * @param {String} eventName
    */
   Dispatch (eventName : string) {
     this.hermes.AddEvent(eventName)

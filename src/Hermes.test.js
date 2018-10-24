@@ -5,11 +5,11 @@ import Action from './Action'
 describe('#Hermes', () => {
   class TestReducer extends Reducer {
     static ACTIONS : Object = {
-      CHANGE : 'testreducer.change'
+      CHANGE : 'actions.testreducer.change'
     }
     
     static EVENTS : Object = {
-      CHANGE : 'testreducer.change'
+      CHANGE : 'events.testreducer.change'
     }
 
     Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
@@ -25,11 +25,11 @@ describe('#Hermes', () => {
 
   class TestArrayReducer extends Reducer {
     static ACTIONS : Object = {
-      CHANGE : 'testarrayreducer.change'
+      CHANGE : 'actions.testarrayreducer.change'
     }
     
     static EVENTS : Object = {
-      CHANGE : 'testarrayreducer.change'
+      CHANGE : 'events.testarrayreducer.change'
     }
 
     Reduce (action : Hermes.Action, state : Array = [], payload : Object) {    
@@ -221,11 +221,11 @@ describe('#Hermes', () => {
   test('Regex paths for reducers should be matched correctly', () => {
     class ContextReducer extends Reducer {
       static ACTIONS : Object = {
-        CHANGE : 'testreducer.change'
+        CHANGE : 'actions.testreducer.change'
       }
       
       static EVENTS : Object = {
-        CHANGE : 'testreducer.change'
+        CHANGE : 'events.testreducer.change'
       }
   
       Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
@@ -271,11 +271,11 @@ describe('#Hermes', () => {
   test('Subscribers and Reducers can both match by ambiguous paths', () => {
     class ContextReducer extends Reducer {
       static ACTIONS : Object = {
-        CHANGE : 'testreducer.change'
+        CHANGE : 'actions.testreducer.change'
       }
       
       static EVENTS : Object = {
-        CHANGE : 'testreducer.change'
+        CHANGE : 'events.testreducer.change'
       }
   
       Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
@@ -321,11 +321,11 @@ describe('#Hermes', () => {
   test('Subscribers and Reducers can both match by ambiguous paths', () => {
     class ContextReducer extends Reducer {
       static ACTIONS : Object = {
-        CHANGE : 'contextreducer.change'
+        CHANGE : 'actions.contextreducer.change'
       }
       
       static EVENTS : Object = {
-        CHANGE : 'contextreducer.change'
+        CHANGE : 'events.contextreducer.change'
       }
   
       Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
@@ -347,11 +347,11 @@ describe('#Hermes', () => {
 
     class ContextReducer2 extends Reducer {
       static ACTIONS : Object = {
-        CHANGE : 'contextreducer2.change'
+        CHANGE : 'actions.contextreducer2.change'
       }
       
       static EVENTS : Object = {
-        CHANGE : 'contextreducer2.change'
+        CHANGE : 'events.contextreducer2.change'
       }
   
       Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
@@ -581,7 +581,7 @@ describe('#Hermes', () => {
 
     const mock : Jest.Mock = jest.fn()
 
-    store.Do(new Action('test.change', {test : 'test'}), 'test')
+    await store.Do(testReducer.Change({test : 'test'}), 'test')
     
     let state : Object = store.GetState()
 
@@ -591,7 +591,7 @@ describe('#Hermes', () => {
       }
     })
 
-    await store.Do(new Action('test.change', ['test1']), 'test')
+    await store.Do(testReducer.Change(['test1']), 'test')
 
     state = store.GetState()
 
@@ -601,7 +601,7 @@ describe('#Hermes', () => {
       ]
     })
 
-    await store.Do(new Action('test.change', {test : 'test'}), 'test')
+    await store.Do(testReducer.Change({test : 'test'}), 'test')
 
     state = store.GetState()
 
@@ -619,7 +619,7 @@ describe('#Hermes', () => {
 
     const mock : Jest.Mock = jest.fn()
 
-    await store.Do(new Action('test.change', {test : {test : 'test'}}), 'test')
+    await store.Do(testReducer.Change({test : {test : 'test'}}), 'test')
     
     let state : Object = store.GetState()
 
@@ -631,7 +631,7 @@ describe('#Hermes', () => {
       }
     })
 
-    await store.Do(new Action('test.change', ['test1']), 'test/test')
+    await store.Do(testReducer.Change(['test1']), 'test/test')
 
     state = store.GetState()
 
@@ -765,11 +765,11 @@ describe('#Hermes', () => {
 
     class ChildReducer extends Reducer {
       static ACTIONS : Object = {
-        CHANGE : 'childreducer.change'
+        CHANGE : 'actions.childreducer.change'
       }
 
       static EVENTS : Object = {
-        CHANGE : 'childreducer.change'
+        CHANGE : 'events.childreducer.change'
       }
 
       Reduce (action : Action, state : state = Object.create(null), payload : payload) {
@@ -932,4 +932,43 @@ describe('#Hermes', () => {
 
     Test()
   })
+
+  test('Actions should trigger their own event', () => {
+    const testReducer = new TestReducer
+
+    const hermes : Hermes = new Hermes({
+      reducers : {
+        'test': testReducer
+      }
+    })
+
+    expect.assertions(1)
+
+    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, (event : Object) => {
+      expect(event.payload).toMatchObject({
+        test : 'test'
+      })
+    })
+
+    hermes.Do(testReducer.Change({test : 'test'}))
+  })
+
+  test('Actions should not trigger their own event if specified not to', () => {
+    const testReducer = new TestReducer
+
+    const hermes : Hermes = new Hermes({
+      dispatchActions : false,
+      reducers : {
+        'test': testReducer
+      }
+    })
+
+    const mock : Jest.Mock = jest.fn()
+
+    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, mock)
+    hermes.Do(testReducer.Change({test : 'test'}))
+    
+    expect(mock).not.toHaveBeenCalled()
+  })
+
 })

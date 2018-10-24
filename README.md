@@ -124,6 +124,7 @@ const store : Hermes = new Hermes({
 7. You can declare as many events as you like inside your reducers
 8. Hermes is child-first. Meaning it will reduce at the bottom-most nodes and then iterate up their path back towards the root.
 9. Actions are executed in the order they are submitted, and are asynchronous.
+10. By default, actions can be listened for like events for coding convenience (no need to have matching event definitions), however, if you wish this not to be the case, you can turn it off by setting dispatchActions to false on the Hermes constructor config object.
 
 ## Hermes Class
 
@@ -237,6 +238,18 @@ store.Subscribe(..., (event : Object) => {
 }, 'a/b/:index/c')
 
 ```
+
+Further to this, as of version 0.5.9, you can listen for actions as you would events. This was added to stop having to explicity create an event for every action, effectively allowing actions to 'double-up' and reducing coding overhead. You can turn this feature off in the Hermes constructor config like so:
+
+```javascript
+
+const store : Hermes = new Hermes({
+  dispatchActions : false,
+  ...
+})
+
+```
+To listen for an action-event just use Subscribe and reference the action name instead.
 
 ### Unsubscribe
 

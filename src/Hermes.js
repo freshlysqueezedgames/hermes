@@ -37,6 +37,7 @@ export default class Hermes {
 
     // Apply props to the instance
     t.verbose = props.verbose || false
+    t.dispatchActions = props.dispatchActions === false ? false : true
 
     t.ignoreEvents = false
 
@@ -422,6 +423,7 @@ async function Query (path: string, action: Action): Promise {
  */
 function Update (steps: Array, action: Action, originalPath : string) : Hermes {
   const t: Hermes = this
+  let actionDispatched : boolean
 
   function OnStep (node : Object, path : Array, payload : Object, test : boolean = false) {
     const strPath : string = path.join('/')
@@ -472,6 +474,11 @@ function Update (steps: Array, action: Action, originalPath : string) : Hermes {
     i = -1
 
     while (++i < l) {
+      if (t.dispatchActions && !actionDispatched && path.join('/') === originalPath) { // we should only trigger once, on the Reducer level that created the action.
+        t.AddEvent(action.name)
+        actionDispatched = true
+      }
+
       state = result[i].Reduce(action, state, payload)
     }
 

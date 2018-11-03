@@ -77,6 +77,16 @@ export default class Reducer {
     return newState
   }
 
+  SilentAction (name : string, payload? : Object, context? : Object) : Action {
+    const action = new Action(name, payload, context, false)
+
+    action.Reducer = () => {
+      return this
+    }
+
+    return action
+  }
+
   /**
    * @name Action
    * @description This is the way the system creates Actions. 

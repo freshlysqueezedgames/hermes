@@ -409,6 +409,7 @@ async function Query (path: string, action: Action): Promise {
 
     OnApply(result)
   } catch (error) {
+    console.log('what the hell just happened?', error)
     throw new Error(error)
   }
 }
@@ -487,7 +488,11 @@ function Update (steps: Array, action: Action, originalPath : string) : Hermes {
 
   function OnAppend (store : Object | Array) {
     // then the returned heap needs to be updated (tree structure, no longer branch path)
-    // payloads exist because we are now in the returned object heap. 
+    // payloads exist because we are now in the returned object heap.
+    if (!action.apply) {
+      return store
+    }
+
     return Tree(store, action.payload, (node : Object, payload : Object, keys : Array) : Object => {
       return OnStep(node, [...steps, ...keys], payload)
     }, t.reducerHeap)

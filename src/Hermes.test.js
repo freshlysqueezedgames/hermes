@@ -5,7 +5,8 @@ import Action from './Action'
 describe('#Hermes', () => {
   class TestReducer extends Reducer {
     static ACTIONS : Object = {
-      CHANGE : 'actions.testreducer.change'
+      CHANGE : 'actions.testreducer.change',
+      SILENT_CHANGE : 'actions.testreducer.silentchange'
     }
     
     static EVENTS : Object = {
@@ -13,6 +14,10 @@ describe('#Hermes', () => {
     }
 
     Reduce (action : Hermes.Action, state : Object = Object.create(null), payload : Object) {
+      if (action.name === TestReducer.ACTIONS.SILENT_CHANGE) {
+        return state
+      }
+      
       this.Dispatch(TestReducer.EVENTS.CHANGE)
 
       return {...state, ...payload}
@@ -20,6 +25,10 @@ describe('#Hermes', () => {
 
     Change (payload : Object, context? : Object) {
       return this.Action(TestReducer.ACTIONS.CHANGE, payload, context)
+    }
+
+    SilentChange (payload: Object) {
+      return this.SilentAction(TestReducer.ACTIONS.SILENT_CHANGE, payload)
     }
   }
 
@@ -967,6 +976,25 @@ describe('#Hermes', () => {
 
     hermes.Subscribe(TestReducer.ACTIONS.CHANGE, mock)
     hermes.Do(testReducer.Change({test : 'test'}))
+    
+    expect(mock).not.toHaveBeenCalled()
+  })
+
+  test('Actions can be triggered withought applying object paramaters in payload to state', () => {
+    const testReducer = new TestReducer
+
+    const hermes : Hermes = new Hermes({
+      reducers : {
+        'test': testReducer
+      }
+    })
+
+    const mock : Jest.Mock = jest.fn().mockImplementation(() => {
+      expect(hermes.GetState()).toMatchObject({})
+    })
+
+    hermes.Subscribe(TestReducer.ACTIONS.CHANGE, mock)
+    hermes.Do(testReducer.SilentChange({test : {test : 'test'}}))
     
     expect(mock).not.toHaveBeenCalled()
   })
